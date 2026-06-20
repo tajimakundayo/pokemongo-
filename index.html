@@ -3,10 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台湾修学旅行パチモン図鑑</title>
+    <title>台湾修学旅行パチモンGO</title>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #1a1a1a; color: #fff; margin: 0; padding: 20px; }
-        h1 { text-align: center; color: #ffd700; text-shadow: 0 0 10px rgba(255,215,0,0.5); }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #1a1a1a; color: #fff; margin: 0; padding: 0; padding-bottom: 70px; }
+        header { background: #222; text-align: center; padding: 15px; border-bottom: 3px solid #ffd700; }
+        h1 { margin: 0; font-size: 24px; color: #ffd700; text-shadow: 0 0 10px rgba(255,215,0,0.5); }
+        
+        /* 画面切り替えスタイル */
+        .page { display: none; padding: 20px; }
+        .page.active { display: block; }
+
+        /* 冒険画面のスタイル */
+        .adventure-zone { text-align: center; max-width: 500px; margin: 0 auto; background: #2a2a2a; padding: 20px; border-radius: 15px; border: 1px solid #444; }
+        .action-box { background: #1f1f1f; margin: 15px 0; padding: 15px; border-radius: 10px; border: 1px dashed #555; }
+        
+        /* 野生エンカウント演出 */
+        .encounter-popup { display: none; background: linear-gradient(135deg, #3a1a3a, #1a1a3a); border: 3px solid #ff00ff; border-radius: 15px; padding: 20px; margin: 20px 0; animation: shake 0.5s ease-in-out; }
+        
+        /* 図鑑画面のスタイル */
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
         .card { background: #2a2a2a; border: 2px solid #444; border-radius: 12px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); position: relative; transition: all 0.3s; }
         .card.unlocked { border-color: #00ffcc; }
@@ -19,24 +33,78 @@
         .monster-img { width: 100px; height: 100px; background: #3a3a3a; display: flex; align-items: center; justify-content: center; font-size: 40px; margin: 10px auto; border-radius: 50%; }
         .shiny-sparkle { color: #ff00ff; animation: blink 1s infinite alternate; font-size: 12px; font-weight: bold; display: none; }
         .desc { font-size: 14px; color: #ddd; background: #1f1f1f; padding: 10px; border-radius: 6px; min-height: 40px; }
+        
+        /* 共通ボタン */
         .btn-group { display: flex; gap: 5px; margin-top: 10px; }
-        button { flex: 1; padding: 8px; border: none; border-radius: 6px; background: #00ffcc; color: #000; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; background: #00ffcc; color: #000; font-weight: bold; font-size: 14px; cursor: pointer; transition: 0.2s; }
         button:hover { background: #00ccaa; }
         button:disabled { background: #444; color: #888; cursor: not-allowed; }
-        button.btn-shiny-toggle { background: #ff00ff; color: #fff; display: none; }
+        button.btn-shiny-toggle { background: #ff00ff; color: #fff; display: none; margin-top: 5px; }
         .locked-text { color: #666; font-style: italic; text-align: center; padding: 20px 0; }
+
+        /* 下部ナビゲーションバー */
+        nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #222; border-top: 3px solid #ffd700; display: flex; z-index: 100; }
+        nav div { flex: 1; text-align: center; padding: 15px 0; cursor: pointer; font-weight: bold; font-size: 16px; color: #aaa; transition: 0.2s; }
+        nav div.active { color: #ffd700; background: #333; }
+
+        /* アニメーション */
         @keyframes blink { from { opacity: 0.4; } to { opacity: 1; } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-10px); } 40%, 80% { transform: translateX(10px); } }
     </style>
 </head>
 <body>
 
-    <h1>🇨🇳 台湾修学旅行パチモン図鑑 🇹🇼</h1>
-    <div class="grid" id="zukan-grid"></div>
+    <header>
+        <h1>🇹🇼 台湾修学旅行パチモンGO 🇨🇳</h1>
+    </header>
+
+    <div id="page-adventure" class="page active">
+        <div class="adventure-zone">
+            <h2>🌍 現地探索・アクションパネル</h2>
+            <p style="font-size: 13px; color: #ccc;">修学旅行の各スポットに着いたら、下のボタンからパチモンを捕まえよう！</p>
+            
+            <div class="action-box">
+                <label for="spot-select" style="display:block; margin-bottom:8px; font-weight:bold;">📍 現在いる場所を選択：</label>
+                <select id="spot-select" style="width:100%; padding:10px; border-radius:6px; background:#444; color:#fff; border:none; margin-bottom:10px;">
+                    </select>
+                <button onclick="encounterNormal()">周囲を探索して捕まえる！</button>
+            </div>
+
+            <div class="action-box">
+                <p style="margin: 0 0 10px 0; font-weight: bold;">⚡ 指の限界に挑め！</p>
+                <button onclick="tapAction()" style="background:#ff9900; color:#fff;">画面を連打する！ (<span id="tap-count">0</span>/30)</button>
+            </div>
+
+            <div class="action-box">
+                <p style="margin: 0 0 10px 0; font-weight: bold;">✈️ 特殊エリアチェックイン</p>
+                <div style="display:flex; gap:5px;">
+                    <button onclick="encounterSpecial(16)" style="background:#555; color:#fff; font-size:12px;">三国丘高校</button>
+                    <button onclick="encounterSpecial(17)" style="background:#555; color:#fff; font-size:12px;">関西国際空港</button>
+                </div>
+            </div>
+
+            <p style="font-size:11px; color:#777; margin-top:20px;">※スマホを置いたまま数秒じっと見つめていると、何かが気配を察知して現れるかもしれない…</p>
+
+            <div id="hidden-encounter" class="encounter-popup">
+                <h3 style="color:#ff00ff; margin:0 0 10px 0;">⚠️ 警告：未知の気配を検知！</h3>
+                <div id="hidden-monster-info" style="font-size:18px; font-weight:bold; margin-bottom:15px;"></div>
+                <button onclick="catchHidden()" style="background:#ff00ff; color:#fff; font-size:16px;">捕獲を試みる！！</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="page-zukan" class="page">
+        <div class="grid" id="zukan-grid"></div>
+    </div>
+
+    <nav>
+        <div id="tab-adventure" class="active" onclick="switchPage('adventure')">🧭 冒険する</div>
+        <div id="tab-zukan" onclick="switchPage('zukan')">📖 パチモン図鑑</div>
+    </nav>
 
     <script>
         // モンスターマスターデータ
         const monsterData = [
-            // 通常モンスター
             { id: 1, type: 'normal', location: 'ホテル', name: '小籠包くん', desc: '一見なんの変哲もない小籠包。彼の中には熱き魂が、、、', emoji: '🥟', canShiny: false },
             { id: 2, type: 'normal', location: '桃園空港', name: '隊ワン', desc: '隊列になった犬たち。かわいい。', emoji: '🐕', canShiny: true },
             { id: 3, type: 'normal', location: '淡水', name: '鯛わん', desc: '淡水にいるけど海水魚。', emoji: '🐟', canShiny: true },
@@ -53,7 +121,6 @@
             { id: 14, type: 'normal', location: '永康街', name: 'マンゴリラ', desc: '可食部はゴリラの部分だけらしい。一体上の部分はなんだというのか。', emoji: '🦍', canShiny: true },
             { id: 15, type: 'normal', location: '士林夜市', name: 'ルーローはん', desc: '知らんけど、そう言い残して彼は大阪へ帰った。', emoji: '🍚', canShiny: true },
             
-            // 隠しモンスター
             { id: 16, type: 'hidden', location: '三国丘高校で会える', name: 'ミクニン', desc: '僕らと一緒には来てくれないらしい。', emoji: '🏫', canShiny: true },
             { id: 17, type: 'hidden', location: '関西国際空港で会える', name: 'ジャポン', desc: '飛行機が怖くて世界を知らない蛙。船もあるのに。まさに井の中の蛙である。', emoji: '🐸', canShiny: true },
             { id: 18, type: 'hidden', location: '画面を連打すると出現', name: 'レンダキング', desc: '隠しキャラの定番。高橋名人は今見てもすごいよね。', emoji: '👑', canShiny: true },
@@ -61,117 +128,134 @@
             { id: 20, type: 'hidden', location: '小籠包くんを譲渡進化', name: '超籠包', desc: '小籠包の中身が譲渡で成長。中身を見たものは次の日にはいなくなっている。', emoji: '🔱', canShiny: true }
         ];
 
-        // プレイヤーの状態管理
+        // プレイヤーデータ初期化
         const playerState = {};
         monsterData.forEach(m => {
             playerState[m.id] = { count: 0, unlocked: false, hasShiny: false, viewMode: 'normal' };
         });
-
-        // 譲渡イベント用フラグ
         let hasReceivedTransfer = false;
+        let tapCount = 0;
+        let activeHiddenEncounterId = null;
+        let lastActivityTime = Date.now();
 
-        const grid = document.getElementById('zukan-grid');
+        // プルダウンメニュー自動生成
+        const select = document.getElementById('spot-select');
+        monsterData.forEach(m => {
+            if(m.type === 'normal') {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.innerText = m.location;
+                select.appendChild(opt);
+            }
+        });
 
-        function renderZukan() {
-            grid.innerHTML = '';
-            
-            monsterData.forEach(m => {
-                const state = playerState[m.id];
-                const card = document.createElement('div');
-                card.className = `card ${state.unlocked ? 'unlocked' : ''} ${state.viewMode === 'shiny' ? 'shiny-mode' : ''}`;
-                
-                // 隠しモンスター（未入手）の完全隠蔽
-                if (m.type === 'hidden' && !state.unlocked) {
-                    card.innerHTML = `
-                        <div class="badge hidden">SECRET</div>
-                        <div class="locked-text">❓ ？？？？？？？？？？</div>
-                        <button onclick="getMonster(${m.id})">条件クリア(デバッグ用)</button>
-                    `;
-                    grid.appendChild(card);
-                    return;
-                }
-
-                const badgeText = m.type === 'normal' ? '通常' : '隠し';
-                const badgeClass = m.type === 'normal' ? 'normal' : 'hidden';
-                
-                let html = `<div class="badge ${badgeClass}">${badgeText}</div>`;
-                html += m.type === 'normal' ? `<div class="location">📍 出現場所: ${m.location}</div>` : `<div class="location">✨ 解放条件: ${m.location}</div>`;
-
-                if (state.unlocked) {
-                    // 解放済みの見た目
-                    const currentEmoji = state.viewMode === 'shiny' ? '✨' + m.emoji + '✨' : m.emoji;
-                    const displayName = state.viewMode === 'shiny' ? m.name + ' (色違い)' : m.name;
-                    
-                    html += `
-                        <div class="monster-name">${displayName} <span class="shiny-sparkle" id="sparkle-${m.id}">★SHINY★</span></div>
-                        <div class="monster-img">${currentEmoji}</div>
-                        <div class="desc">${m.desc}</div>
-                    `;
-
-                    // ボタン配置
-                    if (m.id === 1) {
-                        // 小籠包くん専用ボタン（1度だけ譲渡を受けられる）
-                        html += `
-                            <div class="btn-group">
-                                <button id="transfer-btn" onclick="receiveTransfer()" ${hasReceivedTransfer ? 'disabled' : ''}>
-                                    ${hasReceivedTransfer ? '譲渡受付済み' : '友達から譲渡を受ける'}
-                                </button>
-                            </div>
-                        `;
-                    } else {
-                        // 通常の獲得ボタン
-                        html += `
-                            <div class="btn-group">
-                                <button onclick="getMonster(${m.id})">さらにGET</button>
-                                <button class="btn-shiny-toggle" id="shiny-btn-${m.id}" onclick="toggleShiny(${m.id})">色違い切替</button>
-                            </div>
-                        `;
-                    }
-                } else {
-                    // 未解放状態（場所のみ表示）
-                    html += `
-                        <div class="monster-name">？？？？？</div>
-                        <div class="monster-img">🔒</div>
-                        <div class="desc" style="color:#555; text-align:center;">未入手のためデータなし</div>
-                        <div class="btn-group">
-                            <button onclick="getMonster(${m.id})">現地で捕まえる</button>
-                        </div>
-                    `;
-                }
-
-                card.innerHTML = html;
-                grid.appendChild(card);
-
-                // 各種ボタン・エフェクトの動的制御
-                if (state.unlocked) {
-                    if (state.hasShiny) {
-                        const shinyBtn = document.getElementById(`shiny-btn-${m.id}`);
-                        if (shinyBtn) shinyBtn.style.display = 'block';
-                    }
-                    if (state.viewMode === 'shiny') {
-                        const sparkle = document.getElementById(`sparkle-${m.id}`);
-                        if (sparkle) sparkle.style.display = 'inline';
-                    }
-                }
-            });
+        // 画面（タブ）切り替え
+        function switchPage(pageName) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('nav div').forEach(t => t.classList.remove('active'));
+            document.getElementById(`page-${pageName}`).classList.add('active');
+            document.getElementById(`tab-${pageName}`).classList.add('active');
+            updateActivity();
+            if(pageName === 'zukan') renderZukan();
         }
 
-        // 通常のモンスター獲得処理
-        function getMonster(id) {
+        // 通常モンスター獲得処理
+        function encounterNormal() {
+            updateActivity();
+            const selectedId = parseInt(select.value);
+            executeCatch(selectedId);
+        }
+
+        // 地名系・隠しチェックイン処理
+        function encounterSpecial(id) {
+            updateActivity();
+            executeCatch(id);
+        }
+
+        // 連打アクション
+        function tapAction() {
+            updateActivity();
+            if (playerState[18].unlocked) {
+                alert('レンダキングはすでに捕獲済みです！高橋名人もにっこり。');
+                return;
+            }
+            tapCount++;
+            document.getElementById('tap-count').innerText = tapCount;
+
+            if (tapCount >= 30) {
+                triggerHiddenEncounter(18);
+                tapCount = 0;
+                document.getElementById('tap-count').innerText = tapCount;
+            }
+        }
+
+        // 放置検知システム（10秒何も操作がないとホウチドラゴン出現）
+        function updateActivity() { lastActivityTime = Date.now(); }
+        window.onclick = updateActivity;
+        window.onchange = updateActivity;
+
+        setInterval(() => {
+            if (Date.now() - lastActivityTime >= 10000 && !playerState[19].unlocked && !activeHiddenEncounterId && document.getElementById('page-adventure').classList.contains('active')) {
+                triggerHiddenEncounter(19);
+            }
+        }, 2000);
+
+        // 隠しモンスターの出現演出
+        function triggerHiddenEncounter(id) {
+            activeHiddenEncounterId = id;
+            const m = monsterData.find(x => x.id === id);
+            const popup = document.getElementById('hidden-encounter');
+            const info = document.getElementById('hidden-monster-info');
+            
+            info.innerText = `野生の「 ？？？ (解放条件: ${m.location}) 」が飛び出してきた！`;
+            popup.style.display = 'block';
+        }
+
+        function catchHidden() {
+            if (!activeHiddenEncounterId) return;
+            executeCatch(activeHiddenEncounterId);
+            document.getElementById('hidden-encounter').style.display = 'none';
+            activeHiddenEncounterId = null;
+        }
+
+        // 捕獲コアロジック
+        function executeCatch(id) {
             const m = monsterData.find(x => x.id === id);
             const state = playerState[id];
 
             state.unlocked = true;
             state.count += 1;
 
-            // 色違い判定 (小籠包くん以外、10%の確率)
+            let isShinyEncounter = false;
             if (m.canShiny && !state.hasShiny) {
                 if (Math.random() < 0.10) { 
-                    alert(`✨おめでとう！ 色違いの「${m.name}」を捕まえた！ ✨`);
+                    isShinyEncounter = true;
                     state.hasShiny = true;
                     state.viewMode = 'shiny';
                 }
             }
+
+            if (isShinyEncounter) {
+                alert(`✨奇跡！！色違いの「${m.name}」を捕まえた！図鑑を確認しよう！✨`);
+            } else {
+                alert(`🎉「${m.name}」を捕まえて図鑑に登録した！`);
+            }
+            renderZukan();
+        }
+
+        // 小籠包くん専用・譲渡進化イベント
+        function receiveTransfer() {
+            if (hasReceivedTransfer) return;
+            if (!playerState[1].unlocked) {
+                alert('まだ自分の「小籠包くん」を捕まえていません！まずはホテルで手に入れてからにしましょう！');
+                return;
+            }
+
+            hasReceivedTransfer = true;
+            playerState[20].unlocked = true;
+            playerState[20].count += 1;
+
+            alert('🔴通信完了！友達から小籠包くんが譲渡された！\n\nその瞬間、手元の小籠包くんの中身が共鳴して急成長！隠しモンスター「超籠包」が図鑑に爆誕した！\n（※元の小籠包くんのデータも安全に残っています）');
             renderZukan();
         }
 
@@ -182,30 +266,79 @@
             renderZukan();
         }
 
-        // ★小籠包くんの譲渡・進化イベント処理
-        function receiveTransfer() {
-            if (hasReceivedTransfer) return;
-
-            // 自分がまだ「小籠包くん」を持っていない場合はイベントが起きない
-            if (!playerState[1].unlocked) {
-                alert('まだ自分の「小籠包くん」を捕まえていません！ホテルで手に入れてから譲渡を受けましょう。');
-                return;
-            }
-
-            // フラグをオンにして、1度きりにロック
-            hasReceivedTransfer = true;
-
-            // 進化先「超籠包」を強制解放（元の小籠包くんはそのまま生存）
-            playerState[20].unlocked = true;
-            playerState[20].count += 1;
-
-            alert('🔴通信完了！友達から小籠包くんが譲渡された！\n\nその瞬間、あなたの持っていた小籠包くんの中身が急成長を遂げ、隠しモンスター「超籠包」へと進化した！\n（※元の小籠包くんのデータも図鑑に残っています…）');
+        // 図鑑HTMLレンダリング
+        function renderZukan() {
+            const grid = document.getElementById('zukan-grid');
+            grid.innerHTML = '';
             
-            renderZukan();
-        }
+            monsterData.forEach(m => {
+                const state = playerState[m.id];
+                const card = document.createElement('div');
+                card.className = `card ${state.unlocked ? 'unlocked' : ''} ${state.viewMode === 'shiny' ? 'shiny-mode' : ''}`;
+                
+                // 隠しモンスター（未入手）は完全にシークレット
+                if (m.type === 'hidden' && !state.unlocked) {
+                    card.innerHTML = `
+                        <div class="badge hidden">SECRET</div>
+                        <div class="locked-text">❓ ？？？？？？？？？？</div>
+                    `;
+                    grid.appendChild(card);
+                    return;
+                }
 
-        // 初期起動
-        renderZukan();
+                const badgeText = m.type === 'normal' ? '通常' : '隠し';
+                const badgeClass = m.type === 'normal' ? 'normal' : 'hidden';
+                let html = `<div class="badge ${badgeClass}">${badgeText}</div>`;
+                html += m.type === 'normal' ? `<div class="location">📍 出現場所: ${m.location}</div>` : `<div class="location">✨ 解放条件: ${m.location}</div>`;
+
+                if (state.unlocked) {
+                    // 入手済み
+                    const currentEmoji = state.viewMode === 'shiny' ? '✨' + m.emoji + '✨' : m.emoji;
+                    const displayName = state.viewMode === 'shiny' ? m.name + ' (色違い)' : m.name;
+                    
+                    html += `
+                        <div class="monster-name">${displayName} <span class="shiny-sparkle" id="sparkle-${m.id}">★SHINY★</span></div>
+                        <div class="monster-img">${currentEmoji}</div>
+                        <div class="desc">${m.desc}</div>
+                    `;
+
+                    if (m.id === 1) {
+                        html += `
+                            <div class="btn-group">
+                                <button id="transfer-btn" onclick="receiveTransfer()" ${hasReceivedTransfer ? 'disabled' : ''}>
+                                    ${hasReceivedTransfer ? '譲渡受付済み' : '友達から譲渡を受ける'}
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        html += `
+                            <div class="btn-group">
+                                <button class="btn-shiny-toggle" id="shiny-btn-${m.id}" onclick="toggleShiny(${m.id})">色違い切替</button>
+                            </div>
+                        `;
+                    }
+                } else {
+                    // 未入手（通常モンスター：場所だけ表示）
+                    html += `
+                        <div class="monster-name">？？？？？</div>
+                        <div class="monster-img">🔒</div>
+                        <div class="desc" style="color:#555; text-align:center;">未入手のためデータなし</div>
+                    `;
+                }
+
+                card.innerHTML = html;
+                grid.appendChild(card);
+
+                if (state.unlocked) {
+                    if (state.hasShiny && document.getElementById(`shiny-btn-${m.id}`)) {
+                        document.getElementById(`shiny-btn-${m.id}`).style.display = 'block';
+                    }
+                    if (state.viewMode === 'shiny' && document.getElementById(`sparkle-${m.id}`)) {
+                        document.getElementById(`sparkle-${m.id}`).style.display = 'inline';
+                    }
+                }
+            });
+        }
     </script>
 </body>
 </html>
