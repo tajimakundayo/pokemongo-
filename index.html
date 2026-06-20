@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>パチモンGO - 台湾修学旅行</title>
-    <!-- Leaflet (マップ用) の読み込み -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
-    <!-- Firebaseのプログラム（SDK）を読み込む -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -53,6 +51,7 @@
         let currentActiveSpot = null; 
         let currentIsRare = false;
         let watchId = null; 
+        let lastNotifiedSpotId = null; // 同じスポットで何度も画面全体通知が出ないように制御
         
         let map = null;
         let userMarker = null;
@@ -86,14 +85,14 @@
 
             if (userSnap.exists()) {
                 userData = userSnap.data();
-                myTeam = userData.team || myTeam;
+                myTeam = userData.team ? userData.team.replace("組", "") : myTeam; 
             } else {
                 userData = { username: myUsername, team: myTeam + "組", score: 0, caught: {}, playedSpots: {} };
                 await setDoc(userRef, userData);
             }
 
             document.getElementById("player-name").innerText = myUsername;
-            document.getElementById("player-team").innerText = userData.team || (myTeam + "組");
+            document.getElementById("player-team").innerText = myTeam + "組"; // 🌟 1-8組表記を維持
             document.getElementById("my-score").innerText = userData.score;
 
             document.getElementById("login-area").style.display = "none";
@@ -172,12 +171,19 @@
                         statusDiv.innerHTML = `<span style="color:#2E7D32; font-weight:bold;">✨ 【スポット発見】${spot.name} に近づいた！ボタンを押して探そう！</span>`;
                         radarBtn.style.display = "inline-block";
                         radarBtn.innerText = `👉 ${spot.monster} を探す！`;
+
+                        // 🌟 【新機能】スポット接近時に画面全体を覆うポップアップ通知を表示する
+                        if (lastNotifiedSpotId !== spot.id) {
+                            showFullScreenNotification(spot.name, spot.monster);
+                            lastNotifiedSpotId = spot.id;
+                        }
                         break;
                     }
                 }
                 if (!found) {
                     currentNearbySpot = null;
                     radarBtn.style.display = "none";
+                    lastNotifiedSpotId = null; // スポットから離れたらリセット
                     if (document.getElementById("event-area").style.display !== "block") {
                         statusDiv.innerHTML = "<span style='color:#007BFF;'>🛰️ GPSマップ連動中... 周囲にスポットはありません。</span>";
                     }
@@ -185,10 +191,23 @@
             }, () => { statusDiv.innerText = "GPSエラー。設定を確認してね。"; }, { enableHighAccuracy: true, distanceFilter: 1 });
         }
 
+        // 🌟 【新機能】画面全体のポップアップ通知を表示する関数
+        function showFullScreenNotification(spotName, monsterName) {
+            const overlay = document.getElementById("fullscreen-alert");
+            document.getElementById("alert-spot-name").innerText = spotName;
+            document.getElementById("alert-monster-name").innerText = monsterName;
+            overlay.style.display = "flex";
+        }
+
+        window.closeFullScreenNotification = function() {
+            document.getElementById("fullscreen-alert").style.display = "none";
+        }
+
         window.clickToEncounter = function() {
             if (!currentNearbySpot) return;
             currentActiveSpot = currentNearbySpot;
             document.getElementById("radar-appear-btn").style.display = "none";
+            closeFullScreenNotification(); // 通知が開いていたら閉じる
             triggerCatchEvent(currentActiveSpot);
         }
 
@@ -214,6 +233,9 @@
             document.getElementById("catch-btn").classList.remove("disabled");
             document.getElementById("catch-btn").innerText = "モンスターボールを投げる！";
             document.getElementById("event-area").style.display = "block";
+            
+            // エンカウント時に画面を少しスクロールさせる
+            document.getElementById("event-area").scrollIntoView({ behavior: 'smooth' });
         }
 
         window.tryCatch = async function() {
@@ -224,19 +246,36 @@
             document.getElementById("catch-btn").innerText = "終了";
 
             const isSuccess = Math.random() <= 0.70;
+            const flashOverlay = document.getElementById("flash-overlay");
 
-            if (isSuccess) {
-                userData.caught[currentActiveSpot.id] = currentIsRare ? "rare" : "normal";
-                userData.score += currentIsRare ? 30 : 10;
-                alert(currentIsRare ? `🎉大勝利！レアの「${currentActiveSpot.monster}」を捕まえた！(30P)` : `🎉「${currentActiveSpot.monster}」を捕まえた！(10P)`);
-            } else {
-                alert(`😭「${currentActiveSpot.monster}」は逃げてしまった...！`);
-            }
+            // 🌟 【演出】ボールを投げた瞬間に画面を白く3回点滅させる
+            flashOverlay.className = "flash-active";
+            
+            setTimeout(async () => {
+                flashOverlay.className = ""; // 演出終了
 
-            await setDoc(doc(db, "users", myUsername), userData);
-            document.getElementById("my-score").innerText = userData.score;
-            document.getElementById("event-area").style.display = "none";
-            updateSpotListUI();
+                if (isSuccess) {
+                    userData.caught[currentActiveSpot.id] = currentIsRare ? "rare" : "normal";
+                    userData.score += currentIsRare ? 30 : 10;
+                    
+                    // 🌟 【演出】成功時はさらに画面をド派手にきらめかせる
+                    flashOverlay.className = "flash-success";
+                    setTimeout(() => { flashOverlay.className = ""; }, 500);
+
+                    alert(currentIsRare ? `🎉大勝利！レアの「${currentActiveSpot.monster}」を捕まえた！(30P)` : `🎉「${currentActiveSpot.monster}」を捕まえた！(10P)`);
+                } else {
+                    // 🌟 【演出】失敗時は画面を暗く落胆させる
+                    flashOverlay.className = "flash-fail";
+                    setTimeout(() => { flashOverlay.className = ""; }, 500);
+
+                    alert(`😭「${currentActiveSpot.monster}」は逃げてしまった...！`);
+                }
+
+                await setDoc(doc(db, "users", myUsername), userData);
+                document.getElementById("my-score").innerText = userData.score;
+                document.getElementById("event-area").style.display = "none";
+                updateSpotListUI();
+            }, 1200); // 1.2秒間ボールが揺れるような演出時間をキープ
         }
 
         window.giftMonster = async function(spotId, monsterName, rarity) {
@@ -256,7 +295,9 @@
                     const myDataLocal = mySnap.data();
                     const targetDataLocal = targetSnap.data();
 
-                    if (myDataLocal.team !== targetDataLocal.team) throw `相手は違う組(${targetDataLocal.team})です！`;
+                    const myTeamStr = myTeam + "組";
+                    const targetTeamStr = targetDataLocal.team || "";
+                    if (myTeamStr !== targetTeamStr) throw `相手は違う組(${targetTeamStr})です！`;
                     if (targetDataLocal.caught[spotId]) throw `相手はすでに持っています！`;
 
                     const lostScore = (rarity === "rare") ? 30 : 10;
@@ -326,21 +367,20 @@
             });
         }
 
-        // 🌟 ランキングを上位10位までに制限するよう修正
         function startRankingListener() {
             onSnapshot(collection(db, "users"), (snapshot) => {
                 let players = [];
                 snapshot.forEach(doc => players.push(doc.data()));
                 players.sort((a, b) => b.score - a.score);
 
-                // 🌟 上位10名だけを切り抜く（sliceメソッド）
                 let topTenPlayers = players.slice(0, 10);
 
                 const rankDiv = document.getElementById("ranking-ui");
                 rankDiv.innerHTML = "";
                 topTenPlayers.forEach((p, index) => {
                     let medal = index === 0 ? "🥇 " : index === 1 ? "🥈 " : index === 2 ? "🥉 " : "";
-                    rankDiv.innerHTML += `<div style="padding:4px 0; border-bottom:1px dashed #eee;">${medal}${index + 1}位: <b>${p.username}</b> (${p.team}) - <span style="color:#FF5722; font-weight:bold;">${p.score}P</span></div>`;
+                    let teamLabel = p.team ? p.team : ""; 
+                    rankDiv.innerHTML += `<div style="padding:4px 0; border-bottom:1px dashed #eee;">${medal}${index + 1}位: <b>${p.username}</b> (${teamLabel}) - <span style="color:#FF5722; font-weight:bold;">${p.score}P</span></div>`;
                 });
             });
         }
@@ -377,13 +417,49 @@
         .team-btn { background: #007BFF; box-shadow: 0 4px 0 #0056b3; font-size: 14px; padding: 10px; border-radius: 8px; }
         .team-btn.selected { background: #4CAF50 !important; box-shadow: 0 4px 0 #388E3C !important; }
         .spot-list { text-align: left; font-size: 14px; max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 8px; }
+
+        /* 🌟 【新演出スタイル】画面全体の通知ポップアップ */
+        .fullscreen-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); display: none; justify-content: center; align-items: center; z-index: 9999; flex-direction: column; color: white; box-sizing: border-box; padding: 20px; }
+        .alert-card { background: #fff; color: #333; padding: 30px 20px; border-radius: 20px; text-align: center; max-width: 380px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.3); animation: scaleUp 0.3s ease-out; }
+        @keyframes scaleUp { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .alert-title { font-size: 24px; color: #FF5722; font-weight: bold; margin-bottom: 10px; animation: blink 0.5s infinite alternate; }
+        @keyframes blink { from { opacity: 0.7; } to { opacity: 1; } }
+
+        /* 🌟 【新演出スタイル】捕獲時の画面フラッシュアニメーション */
+        #flash-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 10000; background: transparent; transition: background 0.1s; }
+        .flash-active { animation: ballShakeFlash 1.2s ease-in-out; }
+        @keyframes ballShakeFlash {
+            0% { background: rgba(255, 255, 255, 0); }
+            20% { background: rgba(255, 255, 255, 0.9); }
+            40% { background: rgba(255, 255, 255, 0); }
+            60% { background: rgba(255, 255, 255, 0.9); }
+            80% { background: rgba(255, 255, 255, 0); }
+            100% { background: rgba(255, 255, 255, 0.9); }
+        }
+        .flash-success { animation: successFlash 0.5s ease-out; }
+        @keyframes successFlash { from { background: rgba(76, 175, 80, 0.6); } to { background: transparent; } }
+        .flash-fail { animation: failFlash 0.5s ease-out; }
+        @keyframes failFlash { from { background: rgba(0, 0, 0, 0.7); } to { background: transparent; } }
     </style>
 </head>
 <body>
 
+    <div id="flash-overlay"></div>
+
+    <div id="fullscreen-overlay" class="fullscreen-overlay" id="fullscreen-alert">
+        <div class="alert-card">
+            <div class="alert-title">⚡ SPOT DETECTED ⚡</div>
+            <p style="font-size: 16px; margin: 15px 0;">スポット「<span id="alert-spot-name" style="font-weight: bold; color: #007BFF;"></span>」に到着しました！</p>
+            <p style="font-size: 18px; font-weight: bold; color: #2E7D32; background: #E8F5E9; padding: 10px; border-radius: 10px;">野生の「<span id="alert-monster-name"></span>」が出現中！</p>
+            <div style="margin-top: 25px;">
+                <button onclick="clickToEncounter()" style="background: #4CAF50; box-shadow: 0 4px 0 #388E3C; width: 85%;">パチモンを探す！</button><br>
+                <button onclick="closeFullScreenNotification()" style="background: #9e9e9e; box-shadow: 0 4px 0 #757575; font-size: 13px; padding: 6px 15px; margin-top: 10px;">あとで（閉じる）</button>
+            </div>
+        </div>
+    </div>
+
     <h1>🇹🇼 パチモンGO 🇹🇼</h1>
     
-    <!-- 1. ログイン画面 -->
     <div class="card" id="login-area">
         <h3>プレイヤー登録</h3>
         <input type="text" id="username-input" placeholder="名前を入力" style="padding: 12px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; width: 80%; margin-bottom: 15px;"><br>
@@ -405,7 +481,6 @@
         </div>
     </div>
 
-    <!-- 2. メインゲーム画面 -->
     <div id="game-area" style="display: none;">
         <div class="card" style="padding: 10px;">
             <h4 style="margin: 5px 0; color:#007BFF;">🗺️ リアルタイム周辺マップ</h4>
@@ -421,7 +496,6 @@
             <button id="radar-appear-btn" onclick="clickToEncounter()" style="display:none; background: #4CAF50; box-shadow: 0 4px 0 #388E3C; margin-top:10px; animation: pulse 0.8s infinite alternate; width:90%;">モンスターを探す！</button>
         </div>
 
-        <!-- 捕獲イベントエリア -->
         <div id="event-area" class="card" style="display: none;">
             <h2 style="color: #E91E63;">⚠️ モンスター遭遇！ ⚠️</h2>
             <img id="monster-img" src="" class="battle-img">
@@ -429,13 +503,11 @@
             <button id="catch-btn" onclick="tryCatch()">モンスターボールを投げる！</button>
         </div>
 
-        <!-- 🌟 10位まで表示のランキングエリア -->
         <div class="card">
             <h3 style="color: #FF9800;">🏆 リアルタイムランキング (TOP 10) 🏆</h3>
             <div class="spot-list" id="ranking-ui"></div>
         </div>
 
-        <!-- 画像付きグリッド図鑑 -->
         <div class="card">
             <h3 style="color: #4CAF50;">📖 パチモン図鑑（全15種）</h3>
             <div class="book-grid" id="book-grid-ui"></div>
