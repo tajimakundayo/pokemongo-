@@ -7,13 +7,15 @@
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; text-align: center; padding: 15px; background: #eef2f3; color: #333; margin: 0; }
         .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin: 15px auto; max-width: 400px; }
-        button { padding: 12px 24px; font-size: 16px; font-weight: bold; background: #FF5722; color: white; border: none; border-radius: 25px; cursor: pointer; box-shadow: 0 4px 0 #D84315; }
+        button { padding: 12px 24px; font-size: 16px; font-weight: bold; background: #FF5722; color: white; border: none; border-radius: 25px; cursor: pointer; box-shadow: 0 4px 0 #D84315; margin: 5px; }
         button:active { transform: translateY(4px); box-shadow: none; }
         .disabled { background: #9e9e9e !important; box-shadow: 0 4px 0 #757575 !important; cursor: not-allowed; }
         .monster-box { font-size: 70px; margin: 10px; animation: bounce 0.5s infinite alternate; }
         @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-10px); } }
         .spot-list { text-align: left; font-size: 14px; max-height: 150px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 8px; }
-        select { padding: 10px; font-size: 16px; border-radius: 5px; margin-bottom: 10px; width: 75%; }
+        /* チーム選択ボタン用のスタイル */
+        .team-btn { background: #007BFF; box-shadow: 0 4px 0 #0056b3; }
+        .team-btn.selected { background: #4CAF50 !important; box-shadow: 0 4px 0 #388E3C !important; }
     </style>
 </head>
 <body>
@@ -22,20 +24,22 @@
     
     <div class="card" id="login-area">
         <h3>プレイヤー登録</h3>
-        <input type="text" id="username-input" placeholder="名前を入力" style="padding: 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; width: 70%; margin-bottom: 10px;"><br>
-        <select id="team-input">
-            <option value="">所属チームを選択してね</option>
-            <option value="A">Aチーム</option>
-            <option value="B">Bチーム</option>
-            <option value="C">Cチーム</option>
-        </select><br>
-        <button onclick="startGame()">ゲームスタート</button>
+        <input type="text" id="username-input" placeholder="名前を入力" style="padding: 12px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; width: 80%; margin-bottom: 15px;"><br>
+        
+        <p style="margin: 5px 0; font-weight: bold;">所属チームをタップしてね</p>
+        <button type="button" class="team-btn" id="btn-teamA" onclick="selectTeam('A')">Aチーム</button>
+        <button type="button" class="team-btn" id="btn-teamB" onclick="selectTeam('B')">Bチーム</button>
+        <button type="button" class="team-btn" id="btn-teamC" onclick="selectTeam('C')">Cチーム</button>
+        
+        <div style="margin-top: 20px;">
+            <button onclick="startGame()" style="background: #E91E63; box-shadow: 0 4px 0 #C2185B; width: 60%;">ゲームスタート</button>
+        </div>
     </div>
 
     <div id="game-area" style="display: none;">
         <div class="card">
             <h2>こんにちは、<span id="player-name" style="color:#007BFF;"></span> さん！</h2>
-            <p>所属: <span id="player-team" style="font-weight:bold;"></span>チーム</p>
+            <p>所属: <span id="player-team" style="font-weight:bold; color:#4CAF50;"></span>チーム</p>
             <p>現在の合計ポイント: <span id="my-score" style="font-weight:bold; color:#FF5722; font-size:20px;">0</span> P</p>
             <button onclick="checkLocation()">現在地をスキャンする</button>
             <div id="status" style="margin-top:10px; font-weight:bold;">近くのスポットに近づいてスキャンしよう！</div>
@@ -55,7 +59,7 @@
     </div>
 
     <script>
-        // === 成功したテスト用座標を1番目に書き換え済み ===
+        // テスト用の座標を1番目に設定済み
         const spots = [
             { id: 1, name: "台北101 (日本テスト用)", lat: 34.49634, lng: 135.51357, monster: "タピオカ龍", score: 10, isPlayed: false, hasMonster: false, isRare: false },
             { id: 2, name: "故宮博物院", lat: 25.1023, lng: 121.5484, monster: "ハクサイ獣", score: 10, isPlayed: false, hasMonster: false, isRare: false },
@@ -67,4 +71,143 @@
             { id: 8, name: "高雄・蓮池潭", lat: 22.6845, lng: 120.2926, monster: "リュウトラ猫", score: 10, isPlayed: false, hasMonster: false, isRare: false },
             { id: 9, name: "日月潭", lat: 23.8582, lng: 120.9126, monster: "ミズウミ魚", score: 10, isPlayed: false, hasMonster: false, isRare: false },
             { id: 10, name: "太魯閣（タロコ）渓谷", lat: 24.1593, lng: 121.6214, monster: "イワノ岩男", score: 10, isPlayed: false, hasMonster: false, isRare: false },
-            { id
+            { id: 11, name: "平渓（ランタン飛ばし）", lat: 25.0256, lng: 121.7401, monster: "ランタン精", score: 10, isPlayed: false, hasMonster: false, isRare: false },
+            { id: 12, name: "野柳地質公園", lat: 25.2064, lng: 121.6905, monster: "クイーン女王", score: 10, isPlayed: false, hasMonster: false, isRare: false },
+            { id: 13, name: "淡水（ダンシュイ）", lat: 25.1706, lng: 121.4409, monster: "ユウヤケ鳥", score: 10, isPlayed: false, hasMonster: false, isRare: false },
+            { id: 14, name: "阿里山", lat: 23.5111, lng: 120.8031, monster: "タイザン木の精", score: 10, isPlayed: false, hasMonster: false, isRare: false },
+            { id: 15, name: "台南・赤嵌楼", lat: 22.9976, lng: 120.2026, monster: "レキシ古亀", score: 10, isPlayed: false, hasMonster: false, isRare: false }
+        ];
+
+        let currentActiveSpot = null;
+        let currentIsRare = false;
+        let myUsername = "";
+        let myTeam = "";
+
+        // チーム選択の処理
+        function selectTeam(teamName) {
+            myTeam = teamName;
+            // ボタンの色をリセット
+            document.getElementById("btn-teamA").classList.remove("selected");
+            document.getElementById("btn-teamB").classList.remove("selected");
+            document.getElementById("btn-teamC").classList.remove("selected");
+            // 選んだチームのボタンだけ色を変える
+            document.getElementById("btn-team" + teamName).classList.add("selected");
+        }
+
+        function getDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371000;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        function startGame() {
+            myUsername = document.getElementById("username-input").value.trim();
+            if (!myUsername) { alert("名前を入力してね！"); return; }
+            if (!myTeam) { alert("チームをどれか1つタップして選んでね！"); return; }
+            
+            document.getElementById("player-name").innerText = myUsername;
+            document.getElementById("player-team").innerText = myTeam;
+            document.getElementById("login-area").style.display = "none";
+            document.getElementById("game-area").style.display = "block";
+            updateSpotListUI();
+        }
+
+        function checkLocation() {
+            const statusDiv = document.getElementById("status");
+            statusDiv.innerText = "GPSスキャン中...";
+            document.getElementById("event-area").style.display = "none";
+            currentActiveSpot = null;
+
+            navigator.geolocation.getCurrentPosition((position) => {
+                const uLat = position.coords.latitude;
+                const uLng = position.coords.longitude;
+                let found = false;
+
+                for (let spot of spots) {
+                    const dist = getDistance(uLat, uLng, spot.lat, spot.lng);
+                    if (dist <= 50) {
+                        found = true;
+                        if (spot.isPlayed) {
+                            statusDiv.innerHTML = `<span style="color:orange;">${spot.name}にいますが、イベントは終了しています。</span>`;
+                            break;
+                        }
+                        currentActiveSpot = spot;
+                        statusDiv.innerHTML = `<span style="color:green;">🎯 ${spot.name}（残り ${Math.round(dist)}m）に到着！</span>`;
+                        triggerCatchEvent(spot);
+                        break;
+                    }
+                }
+                if (!found) {
+                    statusDiv.innerHTML = `<span style="color:red;">近くに観光地スポットがありません。<br>（テスト設定した座標の50m以内に近づいてね！）</span>`;
+                }
+            }, () => { statusDiv.innerText = "GPSエラー。設定を確認してね。"; }, { enableHighAccuracy: true });
+        }
+
+        function triggerCatchEvent(spot) {
+            currentIsRare = Math.random() <= 0.10;
+            const monsterSprite = document.getElementById("monster-sprite");
+            const monsterInfo = document.getElementById("monster-info");
+            
+            if (currentIsRare) {
+                monsterSprite.innerText = "✨👑✨";
+                monsterInfo.innerHTML = `<span style="color:#FF9800;">【レア出現！】金ピカの ${spot.monster} (得点3倍!)</span>`;
+            } else {
+                monsterSprite.innerText = "👾";
+                monsterInfo.innerText = `野生の ${spot.monster} が現れた！`;
+            }
+            
+            document.getElementById("catch-btn").classList.remove("disabled");
+            document.getElementById("catch-btn").innerText = "モンスターボールを投げる！";
+            document.getElementById("event-area").style.display = "block";
+        }
+
+        function tryCatch() {
+            if (!currentActiveSpot || currentActiveSpot.isPlayed) return;
+            
+            currentActiveSpot.isPlayed = true; 
+            document.getElementById("catch-btn").classList.add("disabled");
+            document.getElementById("catch-btn").innerText = "終了";
+
+            const isSuccess = Math.random() <= 0.70;
+
+            if (isSuccess) {
+                currentActiveSpot.hasMonster = true;
+                currentActiveSpot.isRare = currentIsRare;
+                alert(currentIsRare ? `🎉大勝利！！🎉\nレアの「${currentActiveSpot.monster}」を捕まえた！(30P)` : `🎉ナイス！🎉\n「${currentActiveSpot.monster}」を捕まえた！(10P)`);
+            } else {
+                alert(`😭あちゃー！😭\n「${currentActiveSpot.monster}」は逃げてしまった...！`);
+            }
+
+            document.getElementById("event-area").style.display = "none";
+            calculateScore();
+            updateSpotListUI();
+        }
+
+        function calculateScore() {
+            let total = 0;
+            for (let spot of spots) {
+                if (spot.hasMonster) {
+                    total += spot.isRare ? 30 : 10;
+                }
+            }
+            document.getElementById("my-score").innerText = total;
+        }
+
+        function updateSpotListUI() {
+            const listDiv = document.getElementById("spot-list-ui");
+            listDiv.innerHTML = "";
+            spots.forEach(spot => {
+                let statusText = "❌未所持";
+                if (spot.isPlayed) {
+                    statusText = spot.hasMonster ? (spot.isRare ? "✨金ピカ (30P)" : "✅通常 (10P)") : "💨失敗";
+                }
+                listDiv.innerHTML += `<div>・<b>${spot.name}</b>: ${statusText}</div>`;
+            });
+        }
+    </script>
+</body>
+</html>
