@@ -3,666 +3,209 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>パチモンGO - 台湾修学旅行</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, runTransaction, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        // ── 【あなたのFirebase設定】 ──
-        const firebaseConfig = {
-            apiKey: "AIzaSyAao7sTYNZW-Fohull07j6JNz3KZ_TVsLA",
-            authDomain: "pachimon-go.firebaseapp.com",
-            projectId: "pachimon-go",
-            storageBucket: "pachimon-go.firebasestorage.app",
-            messagingSenderId: "35732911731",
-            appId: "1:35732911731:web:a474c014de3d80161e5c06",
-            measurementId: "G-MH27Y692XD"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        // スポットデータ（図鑑説明: description を追加）
-        const spots = [
-            { id: 1, name: "台北101 (日本テスト用)", lat: 34.49634, lng: 135.51357, monster: "タピオカ龍", image: "monster1.png", dummy: "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=150", description: "甘いタピオカミルクティーの川から生まれた龍。モチモチの弾力でどんな攻撃も弾き返すぞ！" },
-            { id: 2, name: "故宮博物院", lat: 25.1023, lng: 121.5484, monster: "ハクサイ獣", image: "monster2.png", dummy: "https://images.unsplash.com/photo-1557683316-973673baf926?w=150", description: "有名な美術品にそっくりな聖獣。頭の葉っぱはみずみずしいが、食べるとものすごく苦いらしい。" },
-            { id: 3, name: "九份（ジョウフェン）", lat: 25.1099, lng: 121.8452, monster: "カオナシ鳥", image: "monster3.png", dummy: "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=150", description: "赤い提灯の灯る街に現れる怪鳥。悲しげな声で鳴き、旅人の心をエモくさせる。" },
-            { id: 4, name: "士林夜市", lat: 25.0879, lng: 121.5241, monster: "ダージーパイ魔", image: "monster4.png", dummy: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150", description: "人間の顔よりデカい平たい魔物。いつもスパイシーな良い香りを漂わせ、お腹を空かせた生徒を誘惑する。" },
-            { id: 5, name: "龍山寺", lat: 25.0369, lng: 121.5003, monster: "パワスポ狐", image: "monster5.png", dummy: "https://images.unsplash.com/photo-1579546929662-711aa81148cf?w=150", description: "強力なスピリチュアルエネルギーをまとった狐。出会っただけで次のテストの点数が上がる噂がある。" },
-            { id: 6, name: "中正紀念堂", lat: 25.0357, lng: 121.5218, monster: "ヘイタイ兵", image: "monster6.png", dummy: "https://images.unsplash.com/photo-1528459801416-a9e53bbf4e17?w=150", description: "1ミリも動かない修行を極めた兵隊パチモン。まばたきを我慢しすぎていつも目が充血している。" },
-            { id: 7, name: "西門町", lat: 25.0441, lng: 121.5065, monster: "若者カエル", image: "monster7.png", dummy: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=150", description: "最新のトレンドに敏感なカエル。タピオカの次に流行るスイーツを常にスマートフォンで検索している。" },
-            { id: 8, name: "高雄・蓮池潭", lat: 22.6845, lng: 120.2926, monster: "リュウトラ猫", image: "monster8.png", dummy: "https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?w=150", description: "龍の口から入り虎の口から出ると幸運が訪れるという。本物はただのめちゃくちゃ強そうな猫。" },
-            { id: 9, name: "日月潭", lat: 23.8582, lng: 120.9126, monster: "ミズウミ魚", image: "monster9.png", dummy: "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=150", description: "太陽と月の光を交互に浴びて美しく輝く魚。湖の底で生徒たちが落としたお土産を拾い集めている。" },
-            { id: 10, name: "太魯閣渓谷", lat: 24.1593, lng: 121.6214, monster: "イワノ岩男", image: "monster10.png", dummy: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=150", description: "大自然の大理石から削り出された頑丈な巨人。大迫力の渓谷の景色を何百年も見守り続けている。" },
-            { id: 11, name: "平渓（ランタン）", lat: 25.0256, lng: 121.7401, monster: "ランタン精", image: "monster11.png", dummy: "https://images.unsplash.com/photo-1533158326339-7f3cf2404354?w=150", description: "夜空へ舞い上がるランタンに宿る妖精。みんなの願い事がたくさん書かれているため、実はちょっと重い。" },
-            { id: 12, name: "野柳地質公園", lat: 25.2064, lng: 121.6905, monster: "クイーン女王", image: "monster12.png", dummy: "https://images.unsplash.com/photo-1543857778-c4a1a3e0b2eb?w=150", description: "女王の頭の形をした奇岩の化身。気高く美しいポーズを崩さないが、首が折れないかハラハラしている。" },
-            { id: 13, name: "淡水（ダンシュイ）", lat: 25.1706, lng: 121.4409, monster: "ユウヤケ鳥", image: "monster13.png", dummy: "https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=150", description: "世界一美しい夕焼けに染まった鳥。ロマンチックな雰囲気が大好きで、カップルの周りを飛び回る。" },
-            { id: 14, name: "阿里山", lat: 23.5111, lng: 120.8031, monster: "タイザン木の精", image: "monster14.png", dummy: "https://images.unsplash.com/photo-1502239608882-93b729c6af43?w=150", description: "樹齢数千年の神木に宿るパチモン。御来光とともに目覚め、淹れたての高山茶を飲むのが日課。" },
-            { id: 15, name: "台南・赤嵌楼", lat: 22.9976, lng: 120.2026, monster: "レキシ古亀", image: "monster15.png", dummy: "https://images.unsplash.com/photo-1525498128493-380d1990a112?w=150", description: "歴史ある石碑を背負った大きな亀。歩みは遅いが、台湾の歴史のことなら何でも知っている大先輩。" },
-            
-            // ─── 隠しモンスター（isHidden: true, isSpecial: true） ───
-            { id: 91, name: "通信進化限定", lat: 0, lng: 0, monster: "タピオカ神龍", image: "hidden91.png", dummy: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=150", isHidden: true, isSpecial: true, description: "友情の通信進化によって覚醒した究極のタピオカ龍。ストローで吸いきれないほどの絶大な神の力を持つ。" },
-            { id: 92, name: "日本の学校（堺市テスト用）", lat: 34.4925, lng: 135.5150, monster: "スクールナイト", image: "hidden92.png", dummy: "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=150", isHidden: true, isSpecial: true, description: "学校の平和を守るために夜な夜な現れる黒鉄の騎士。忘れ物をした生徒の机をこっそり整理してくれる。" },
-            { id: 93, name: "台湾・桃園国際空港", lat: 25.0797, lng: 121.2342, monster: "クウコウ魔人", image: "hidden93.png", dummy: "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=150", isHidden: true, isSpecial: true, description: "空港のロビーを爆速で駆け抜ける魔人。パスポートを忘れた人間を見ると、お仕置きのブザーを鳴らす。" },
-            { id: 94, name: "10回連打ボーナス", lat: 0, lng: 0, monster: "レンダキング", image: "hidden94.png", dummy: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=150", isHidden: true, isSpecial: true, description: "すさまじい連打の衝撃波によって次元の狭間から呼び出された王。指の筋肉がガチガチに鍛えられている。" },
-            { id: 95, name: "7分間放置ボーナス", lat: 0, lng: 0, monster: "ホウチピエロ", image: "hidden95.png", dummy: "https://images.unsplash.com/photo-1509248961158-e54f6934749c?w=150", isHidden: true, isSpecial: true, description: "スマートフォンの前でじっと耐え忍んだ者にだけ微笑む不気味なピエロ。放置されるのが大好物。" }
-        ];
-
-        let myUsername = "";
-        let myTeam = ""; 
-        let userData = { score: 0, caught: {}, playedSpots: {} };
-        let currentNearbySpot = null; 
-        let currentActiveSpot = null; 
-        let currentIsRare = false;
-        let watchId = null; 
-        let lastNotifiedSpotId = null; 
-        let tapCount = 0; 
-        let playTimer = null; 
-        let isEncountering = false; // 遭遇バトルの多重干渉を防ぐロックフラグ
-        
-        let map = null;
-        let userMarker = null;
-        let spotMarkers = {};
-
-        function getDistance(lat1, lng1, lat2, lng2) {
-            const R = 6371000; 
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLng = (lng2 - lng1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLng / 2) * Math.sin(dLng / 2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        }
-
-        window.selectTeam = function(teamNum) {
-            myTeam = teamNum;
-            for (let i = 1; i <= 8; i++) {
-                document.getElementById("btn-team" + i).classList.remove("selected");
-            }
-            document.getElementById("btn-team" + teamNum).classList.add("selected");
-            resetStayTimer(); // 操作を検知したので放置タイマーをリセット
-        }
-
-        window.startGame = async function() {
-            myUsername = document.getElementById("username-input").value.trim();
-            if (!myUsername) { alert("名前を入力してね！"); return; }
-            if (!myTeam) { alert("組を選んでね！"); return; }
-
-            const userRef = doc(db, "users", myUsername);
-            const userSnap = await getDoc(userRef);
-
-            if (userSnap.exists()) {
-                userData = userSnap.data();
-                if (userData.team) {
-                    myTeam = userData.team.replace("組", "");
-                }
-            } else {
-                userData = { username: myUsername, team: myTeam + "組", score: 0, caught: {}, playedSpots: {} };
-                await setDoc(userRef, userData);
-            }
-
-            document.getElementById("player-name").innerText = myUsername;
-            document.getElementById("player-team").innerText = myTeam + "組"; 
-            document.getElementById("my-score").innerText = userData.score;
-
-            document.getElementById("login-area").style.display = "none";
-            document.getElementById("game-area").style.display = "block";
-            
-            initMap();
-            updateSpotListUI();
-            startRankingListener();
-            startGPSWatching(); 
-            resetStayTimer(); // 開始と同時に7分のカウントダウンを起動
-
-            // 画面のどこかをタップしたら放置タイマーをリセットするイベントを設定
-            document.body.addEventListener('click', () => {
-                resetStayTimer();
-            });
-        }
-
-        function initMap() {
-            map = L.map('map').setView([34.49634, 135.51357], 15);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors'
-            }).addTo(map);
-
-            spots.forEach(spot => {
-                if (spot.isHidden) return; 
-
-                let spotMarker = L.circleMarker([spot.lat, spot.lng], {
-                    radius: 12,
-                    color: '#007BFF',
-                    fillColor: '#66B2FF',
-                    fillOpacity: 0.8
-                }).addTo(map);
-                
-                spotMarker.bindPopup(`<b>${spot.name}</b><br>パチモンが生息中！`);
-                spotMarkers[spot.id] = spotMarker;
-            });
-        }
-
-        function startGPSWatching() {
-            const statusDiv = document.getElementById("status");
-            const radarBtn = document.getElementById("radar-appear-btn");
-            statusDiv.innerHTML = "<span style='color:#007BFF;'>🛰️ GPSマップ連動中... スポットに近づこう！</span>";
-
-            if (watchId) navigator.geolocation.clearWatch(watchId);
-
-            watchId = navigator.geolocation.watchPosition((position) => {
-                if (isEncountering) return; // 遭遇戦の間はGPS更新によるUI上書きを防止
-
-                const uLat = position.coords.latitude;
-                const uLng = position.coords.longitude;
-
-                if (map) {
-                    map.setView([uLat, uLng], 16);
-                    if (userMarker) {
-                        userMarker.setLatLng([uLat, uLng]);
-                    } else {
-                        userMarker = L.circleMarker([uLat, uLng], {
-                            radius: 15,
-                            color: '#FF5722',
-                            fillColor: '#FF8A65',
-                            fillOpacity: 0.9
-                        }).addTo(map).bindPopup("あなたの現在地").openPopup();
-                    }
-                }
-
-                let found = false;
-
-                for (let spot of spots) {
-                    if (spot.id === 91 || spot.id === 94 || spot.id === 95) continue; 
-
-                    const dist = getDistance(uLat, uLng, spot.lat, spot.lng);
-                    
-                    if (spotMarkers[spot.id]) {
-                        if (userData.playedSpots[spot.id]) {
-                            spotMarkers[spot.id].setStyle({ color: '#9e9e9e', fillColor: '#bdbdbd' });
-                        }
-                    }
-
-                    if (dist <= 50) { 
-                        found = true;
-                        if (userData.playedSpots[spot.id]) {
-                            statusDiv.innerHTML = `📍 ${spot.name}（調査済み）にいます。`;
-                            radarBtn.style.display = "none";
-                            break;
-                        }
-                        
-                        currentNearbySpot = spot;
-                        statusDiv.innerHTML = `<span style="color:#2E7D32; font-weight:bold;">✨ 【スポット発見】${spot.name} に近づいた！ボタンを押して探そう！</span>`;
-                        radarBtn.style.display = "inline-block";
-                        radarBtn.innerText = `👉 ${spot.monster} を探す！`;
-
-                        if (lastNotifiedSpotId !== spot.id) {
-                            showFullScreenNotification(spot.name, spot.monster);
-                            lastNotifiedSpotId = spot.id;
-                        }
-                        break;
-                    }
-                }
-                if (!found) {
-                    currentNearbySpot = null;
-                    radarBtn.style.display = "none";
-                    lastNotifiedSpotId = null; 
-                    if (document.getElementById("event-area").style.display !== "block") {
-                        statusDiv.innerHTML = "<span style='color:#007BFF;'>🛰️ GPSマップ連動中... 周囲にスポットはありません。</span>";
-                    }
-                }
-            }, () => { statusDiv.innerText = "GPSエラー。設定を確認してね。"; }, { enableHighAccuracy: true, distanceFilter: 1 });
-        }
-
-        window.tapFlag = function(e) {
-            if (e) e.stopPropagation(); // body側のクリックリセット発動と重複させない
-            resetStayTimer(); 
-
-            if (!myUsername || isEncountering) return; 
-            const targetSpot = spots.find(s => s.id === 94); 
-            if (userData.playedSpots[targetSpot.id]) return; 
-
-            tapCount++;
-            if (tapCount >= 10) {
-                tapCount = 0;
-                currentActiveSpot = targetSpot;
-                triggerCatchEvent(currentActiveSpot);
-            }
-        }
-
-        // ⏱️ 放置タイマー制御（アクティブ操作で毎回クリアして7分に再設定）
-        function resetStayTimer() {
-            if (playTimer) clearTimeout(playTimer);
-            
-            const targetSpot = spots.find(s => s.id === 95); 
-            if (!myUsername || (userData && userData.playedSpots && userData.playedSpots[targetSpot.id])) return;
-
-            // 🛠️ 放置時間を「7分（7分×60秒×1000ミリ秒）」に固定
-            playTimer = setTimeout(() => {
-                if (!isEncountering && !userData.playedSpots[targetSpot.id]) {
-                    currentActiveSpot = targetSpot;
-                    triggerCatchEvent(currentActiveSpot);
-                }
-            }, 7 * 60 * 1000); 
-        }
-
-        function showFullScreenNotification(spotName, monsterName) {
-            if (isEncountering) return;
-            const overlay = document.getElementById("fullscreen-overlay");
-            document.getElementById("alert-spot-name").innerText = spotName;
-            document.getElementById("alert-monster-name").innerText = monsterName;
-            overlay.style.display = "flex";
-        }
-
-        window.closeFullScreenNotification = function() {
-            document.getElementById("fullscreen-overlay").style.display = "none";
-        }
-
-        window.clickToEncounter = function() {
-            if (!currentNearbySpot) return;
-            currentActiveSpot = currentNearbySpot;
-            document.getElementById("radar-appear-btn").style.display = "none";
-            closeFullScreenNotification(); 
-            triggerCatchEvent(currentActiveSpot);
-        }
-
-        function triggerCatchEvent(spot) {
-            isEncountering = true; // 他のイベント割り込みをロック
-            const eventCard = document.getElementById("event-area");
-            const monsterImg = document.getElementById("monster-img");
-            const monsterInfo = document.getElementById("monster-info");
-            
-            monsterImg.src = spot.image;
-            monsterImg.onerror = function() { 
-                this.onerror = null; 
-                this.src = spot.dummy; 
-            }; 
-            
-            eventCard.className = "card encounter-card";
-            monsterImg.className = "battle-img";
-
-            if (spot.isSpecial) {
-                currentIsRare = false;
-                eventCard.classList.add("encounter-special"); 
-                monsterImg.classList.add("special-effect");   
-                monsterInfo.innerHTML = `<span class="text-glow-special">😈 【幻の隠しパチモン降臨!!】<br><b style="font-size:24px;">${spot.monster}</b><br>(3倍30P / 捕獲率100%)</span>`;
-            } else {
-                currentIsRare = Math.random() <= 0.10; 
-                if (currentIsRare) {
-                    eventCard.classList.add("encounter-rare"); 
-                    monsterImg.classList.add("rare-effect");   
-                    monsterInfo.innerHTML = `<span class="text-glow-rare">👑 【超豪華レア出現!! (確率10%)】<br><b style="font-size:24px;">✨金ピカの ${spot.monster}✨</b><br>(2倍20P!)</span>`;
-                } else {
-                    monsterInfo.innerText = `野生の ${spot.monster} が現れた！`;
-                }
-            }
-            
-            document.getElementById("catch-btn").classList.remove("disabled");
-            document.getElementById("catch-btn").innerText = "パチゼロボールを投げる！";
-            eventCard.style.display = "block";
-            eventCard.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        window.tryCatch = async function() {
-            if (!currentActiveSpot || userData.playedSpots[currentActiveSpot.id]) return;
-            
-            userData.playedSpots[currentActiveSpot.id] = true;
-            document.getElementById("catch-btn").classList.add("disabled");
-            document.getElementById("catch-btn").innerText = "終了";
-
-            const isSuccess = currentActiveSpot.isSpecial ? true : (Math.random() <= 0.70);
-            const flashOverlay = document.getElementById("flash-overlay");
-
-            flashOverlay.className = "flash-active";
-            
-            setTimeout(async () => {
-                flashOverlay.className = ""; 
-
-                if (isSuccess) {
-                    if (currentActiveSpot.isSpecial) {
-                        userData.caught[currentActiveSpot.id] = "special";
-                        userData.score += 30; 
-                        alert(`🎉大・勝・利！ 幻の「${currentActiveSpot.monster}」を捕獲した！(30P)`);
-                    } else {
-                        userData.caught[currentActiveSpot.id] = currentIsRare ? "rare" : "normal";
-                        userData.score += currentIsRare ? 20 : 10; 
-                        
-                        flashOverlay.className = "flash-success";
-                        setTimeout(() => { flashOverlay.className = ""; }, 500);
-
-                        alert(currentIsRare ? `🎉大勝利！黄金に輝く「${currentActiveSpot.monster}」を捕まえた！(20P)` : `🎉「${currentActiveSpot.monster}」を捕まえた！(10P)`);
-                    }
-                } else {
-                    flashOverlay.className = "flash-fail";
-                    setTimeout(() => { flashOverlay.className = ""; }, 500);
-
-                    alert(`😭「${currentActiveSpot.monster}」は逃げてしまった...！`);
-                }
-
-                await setDoc(doc(db, "users", myUsername), userData);
-                document.getElementById("my-score").innerText = userData.score;
-                document.getElementById("event-area").style.display = "none";
-                isEncountering = false; // ロック解除
-                updateSpotListUI();
-                resetStayTimer(); // 次の放置用タイマーを起動
-            }, 1200); 
-        }
-
-        window.giftMonster = async function(spotId, monsterName, rarity, e) {
-            if (e) e.stopPropagation(); // 図鑑カード側のタップ（説明文ポップアップ）の連動を防ぐ
-            const targetName = prompt(`「${monsterName}」を誰にあげますか？\n相手の「正確なユーザー名」を入力してください。`);
-            if (!targetName) return;
-            if (targetName === myUsername) { alert("自分自身にはあげられません！"); return; }
-
-            const myRef = doc(db, "users", myUsername);
-            const targetRef = doc(db, "users", targetName);
-
-            try {
-                await runTransaction(db, async (transaction) => {
-                    const mySnap = await transaction.get(myRef);
-                    const targetSnap = await transaction.get(targetRef);
-
-                    if (!targetSnap.exists()) throw "相手のユーザーが見つかりません。";
-                    const myDataLocal = mySnap.data();
-                    const targetDataLocal = targetSnap.data();
-
-                    const myTeamStr = myTeam + "組";
-                    const targetTeamStr = targetDataLocal.team || "";
-                    if (myTeamStr !== targetTeamStr) throw `相手は違う組(${targetTeamStr})です！`;
-                    
-                    let finalSpotId = spotId;
-                    let finalRarity = rarity;
-                    let lostScore = (rarity === "rare") ? 20 : 10;
-
-                    if (spotId === 1) {
-                        finalSpotId = 91; 
-                        finalRarity = "special"; 
-                        if (targetDataLocal.caught[91]) throw `相手はすでに進化後の「タピオカ神龍」を持っています！`;
-                    } else {
-                        if (targetDataLocal.caught[spotId]) throw `相手はすでに持っています！`;
-                    }
-
-                    delete myDataLocal.caught[spotId];
-                    myDataLocal.score -= lostScore;
-
-                    targetDataLocal.caught[finalSpotId] = finalRarity;
-                    targetDataLocal.score += (finalSpotId === 91) ? 30 : lostScore;
-                    targetDataLocal.playedSpots[finalSpotId] = true; 
-
-                    transaction.update(myRef, myDataLocal);
-                    transaction.update(targetRef, targetDataLocal);
-                    userData = myDataLocal;
-                });
-
-                alert(`🎉 譲渡成功！${targetName} さんにプレゼントしました！` + (spotId === 1 ? "\n友情の力で「タピオカ神龍」へと進化したぞ！" : ""));
-                document.getElementById("my-score").innerText = userData.score;
-                updateSpotListUI();
-
-            } catch (error) { alert("❌ エラー: " + error); }
-        }
-
-        // 📖 図鑑ポップアップ呼び出し関数
-        window.openMonsterDesc = function(spotId) {
-            const spot = spots.find(s => s.id === spotId);
-            if (!spot) return;
-
-            const isCaught = userData.caught[spotId];
-            // 隠しモンスター（isSpecial）かつ未捕獲の場合はロックを通知
-            if (spot.isSpecial && !isCaught) {
-                alert("🔒 このパチモンはまだ発見されていない！");
-                return;
-            }
-
-            const modal = document.getElementById("desc-modal");
-            document.getElementById("modal-monster-name").innerText = spot.monster;
-            document.getElementById("modal-monster-desc").innerText = spot.description || "データがありません。";
-            
-            const modalImg = document.getElementById("modal-monster-img");
-            modalImg.src = isCaught ? spot.image : spot.dummy;
-            modalImg.onerror = function() { this.onerror = null; this.src = spot.dummy; };
-
-            modal.style.display = "flex";
-        }
-
-        window.closeMonsterDesc = function() {
-            document.getElementById("desc-modal").style.display = "none";
-        }
-
-        function updateSpotListUI() {
-            const gridDiv = document.getElementById("book-grid-ui");
-            gridDiv.innerHTML = "";
-
-            spots.forEach(spot => {
-                const status = userData.caught[spot.id];
-                let cardClass = "book-item locked";
-                let imgSrc = "https://placehold.co/100x100?text=%3F"; 
-                let labelText = "???";
-                let badgeText = "";
-                let giftBtn = "";
-
-                if (status) {
-                    if (status === "special") {
-                        cardClass = "book-item active special";
-                        badgeText = "<span class='badge special-badge'>⭐幻 30P</span>";
-                    } else if (status === "rare") {
-                        cardClass = "book-item active rare";
-                        badgeText = "<span class='badge rare-badge'>✨レア 20P</span>";
-                    } else {
-                        cardClass = "book-item active";
-                        badgeText = "<span class='badge normal-badge'>✅通常 10P</span>";
-                    }
-                    imgSrc = spot.image; 
-                    labelText = spot.monster;
-                    
-                    if (!spot.isSpecial) {
-                        giftBtn = `<button class="gift-btn-mini" onclick="giftMonster(${spot.id}, '${spot.monster}', '${status}', event)">あげる</button>`;
-                    }
-                } else if (userData.playedSpots[spot.id]) {
-                    labelText = "逃亡";
-                    badgeText = "<span class='badge fled-badge'>💨失敗 0P</span>";
-                    imgSrc = spot.image; 
-                } else {
-                    badgeText = spot.isSpecial ? "<span class='badge special-locked-badge'>❓ 隠し</span>" : "<span class='badge locked-badge'>📍未訪問</span>";
-                }
-
-                const imgTagId = `book-img-${spot.id}`;
-                gridDiv.innerHTML += `
-                    <div class="${cardClass}" onclick="openMonsterDesc(${spot.id})">
-                        ${badgeText}
-                        <img id="${imgTagId}" src="${imgSrc}" class="book-img">
-                        <div class="book-name">${labelText}</div>
-                        <div style="font-size:10px; color:#666;">${spot.isSpecial ? "シークレット" : spot.name.split(' ')[0]}</div>
-                        ${giftBtn}
-                    </div>
-                `;
-
-                setTimeout(() => {
-                    const imgEl = document.getElementById(imgTagId);
-                    if (imgEl && (status || userData.playedSpots[spot.id])) {
-                        imgEl.onerror = function() {
-                            this.onerror = null;
-                            this.src = spot.dummy;
-                        };
-                    }
-                }, 50);
-            });
-        }
-
-        function startRankingListener() {
-            // 🔥 Firestoreクエリの最適化（サーバー側で上位10名のみ通信を監視して軽量化）
-            const q = query(collection(db, "users"), orderBy("score", "desc"), limit(10));
-            onSnapshot(q, (snapshot) => {
-                const rankDiv = document.getElementById("ranking-ui");
-                rankDiv.innerHTML = "";
-                let index = 0;
-                snapshot.forEach(doc => {
-                    const p = doc.data();
-                    let medal = index === 0 ? "🥇 " : index === 1 ? "🥈 " : index === 2 ? "🥉 " : "";
-                    let teamLabel = p.team ? p.team : ""; 
-                    rankDiv.innerHTML += `<div style="padding:6px 0; border-bottom:1px dashed #eee;">${medal}${index + 1}位: <b>${p.username}</b> (${teamLabel}) - <span style="color:#FF5722; font-weight:bold;">${p.score}P</span></div>`;
-                    index++;
-                });
-            });
-        }
-    </script>
+    <title>台湾修学旅行パチモン図鑑</title>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; text-align: center; padding: 15px; background: #eef2f3; color: #333; margin: 0; }
-        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin: 15px auto; max-width: 430px; transition: all 0.3s ease; }
-        button { padding: 12px 24px; font-size: 16px; font-weight: bold; background: #FF5722; color: white; border: none; border-radius: 25px; cursor: pointer; box-shadow: 0 4px 0 #D84315; margin: 5px; }
-        button:active { transform: translateY(4px); box-shadow: none; }
-        .disabled { background: #9e9e9e !important; box-shadow: 0 4px 0 #757575 !important; cursor: not-allowed; }
-        
-        #map { height: 280px; width: 100%; border-radius: 10px; margin-top: 10px; border: 2px solid #ccc; box-shadow: inset 0 0 5px rgba(0,0,0,0.2); }
-
-        .battle-img { width: 150px; height: 150px; object-fit: cover; margin: 10px auto; display: block; border-radius: 10px; background: #ddd; border: 3px solid #ccc; transition: all 0.3s; }
-        
-        /* ✨ 豪華演出: ゴールドオーラと3D風シャドウ（色違い用） */
-        .encounter-rare { background: linear-gradient(135deg, #FFFDEB 0%, #FFF59D 100%) !important; border: 3px solid #FFD700; animation: goldGlow 1.5s infinite alternate; }
-        .rare-effect { border: 4px solid #FFD700; box-shadow: 0 0 25px #FFD700; animation: pulse 0.5s infinite alternate; filter: drop-shadow(0 0 8px #FFD700); }
-        .text-glow-rare { color: #E65100; font-weight: bold; text-shadow: 1px 1px 0px #FFF, 0 0 12px rgba(255,215,0,1); font-size: 19px; }
-        @keyframes goldGlow { from { box-shadow: 0 0 10px rgba(255,215,0,0.5); } to { box-shadow: 0 0 35px rgba(255,215,0,1); } }
-
-        /* ✨ 豪華演出: サイケデリック背景グラデーション & 浮遊・立体回転（隠し用） */
-        .encounter-special { background: linear-gradient(45deg, #f3e5f5, #e1bee7, #ce93d8, #b388ff) !important; background-size: 300% 300% !important; border: 3px solid #9C27B0; animation: psychedelicBg 3s ease infinite alternate; }
-        .special-effect { border: 4px solid #9C27B0; box-shadow: 0 0 30px #9C27B0; animation: spinFloat 2.5s infinite ease-in-out alternate; }
-        .text-glow-special { color: #4A148C; font-weight: bold; text-shadow: 1px 1px 0px #FFF, 0 0 15px rgba(156,39,176,0.8); font-size: 19px; }
-        @keyframes psychedelicBg { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        @keyframes spinFloat { 0% { transform: translateY(0px) rotate(0deg) scale(1); } 50% { transform: translateY(-8px) rotate(3deg) scale(1.05); } 100% { transform: translateY(0px) rotate(-3deg) scale(1); } }
-
-        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
-
-        .book-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
-        .book-item { background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 10px; padding: 8px; position: relative; display: flex; flex-direction: column; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.2s; }
-        .book-item:active { transform: scale(0.95); }
-        .book-item.locked { background: #e0e0e0; opacity: 0.7; }
-        .book-item.rare { border: 2px solid #FFD700; background: #FFFDF0; }
-        .book-item.special { border: 2px solid #9C27B0; background: #F3E5F5; }
-        .book-img { width: 75px; height: 75px; object-fit: cover; margin: 5px 0; border-radius: 5px; background: #eee; }
-        .book-name { font-size: 12px; font-weight: bold; margin: 3px 0; }
-        
-        .badge { font-size: 9px; padding: 2px 5px; border-radius: 3px; font-weight: bold; width: 85%; text-align: center; }
-        .normal-badge { background: #E8F5E9; color: #2E7D32; }
-        .rare-badge { background: #FFF8E1; color: #F57F17; }
-        .special-badge { background: #E1BEE7; color: #4A148C; }
-        .fled-badge { background: #FFEBEE; color: #C62828; }
-        .locked-badge { background: #9e9e9e; color: white; }
-        .special-locked-badge { background: #4A148C; color: white; }
-
-        .gift-btn-mini { padding: 3px 8px; font-size: 10px; background: #007BFF; box-shadow: 0 2px 0 #0056b3; margin-top: 5px; border-radius: 5px; width: 90%; border: none; color: white; cursor: pointer; }
-        
-        .team-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 90%; margin: 10px auto; }
-        .team-btn { background: #007BFF; box-shadow: 0 4px 0 #0056b3; font-size: 14px; padding: 10px; border-radius: 8px; }
-        .team-btn.selected { background: #4CAF50 !important; box-shadow: 0 4px 0 #388E3C !important; }
-        .spot-list { text-align: left; font-size: 14px; max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 8px; }
-
-        /* モーダルポップアップ設定（通知・図鑑説明用） */
-        .fullscreen-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); display: none; justify-content: center; align-items: center; z-index: 9999; flex-direction: column; color: white; box-sizing: border-box; padding: 20px; }
-        .alert-card { background: #fff; color: #333; padding: 30px 20px; border-radius: 20px; text-align: center; max-width: 380px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.3); animation: scaleUp 0.3s ease-out; }
-        @keyframes scaleUp { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        .alert-title { font-size: 24px; color: #FF5722; font-weight: bold; margin-bottom: 10px; animation: blink 0.5s infinite alternate; }
-        @keyframes blink { from { opacity: 0.7; } to { transform: scale(1); opacity: 1; } }
-
-        .clickable-flag { cursor: pointer; display: inline-block; transition: transform 0.1s; user-select: none; }
-        .clickable-flag:active { transform: scale(1.4); }
-
-        #flash-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 10000; background: transparent; transition: background 0.1s; }
-        .flash-active { animation: ballShakeFlash 1.2s ease-in-out; }
-        @keyframes ballShakeFlash {
-            0% { background: rgba(255, 255, 255, 0); }
-            20% { background: rgba(255, 255, 255, 0.9); }
-            40% { background: rgba(255, 255, 255, 0); }
-            60% { background: rgba(255, 255, 255, 0.9); }
-            80% { background: rgba(255, 255, 255, 0); }
-            100% { background: rgba(255, 255, 255, 0.9); }
-        }
-        .flash-success { animation: successFlash 0.5s ease-out; }
-        @keyframes successFlash { from { background: rgba(76, 175, 80, 0.6); } to { background: transparent; } }
-        .flash-fail { animation: failFlash 0.5s ease-out; }
-        @keyframes failFlash { from { background: rgba(0, 0, 0, 0.7); } to { background: transparent; } }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #1a1a1a; color: #fff; margin: 0; padding: 20px; }
+        h1 { text-align: center; color: #ffd700; text-shadow: 0 0 10px rgba(255,215,0,0.5); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .card { background: #2a2a2a; border: 2px solid #444; border-radius: 12px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); position: relative; transition: all 0.3s; }
+        .card.unlocked { border-color: #00ffcc; }
+        .card.shiny-mode { border-color: #ff00ff; background: linear-gradient(145deg, #2a2a2a, #3a1a3a); box-shadow: 0 4px 15px rgba(255,0,255,0.4); }
+        .badge { position: absolute; top: 10px; right: 10px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: bold; }
+        .badge.normal { background: #555; }
+        .badge.hidden { background: #ff3366; }
+        .location { color: #aaa; font-size: 13px; margin-bottom: 5px; }
+        .monster-name { font-size: 20px; font-weight: bold; color: #ffd700; margin: 5px 0; }
+        .monster-img { width: 100px; height: 100px; background: #3a3a3a; display: flex; align-items: center; justify-content: center; font-size: 40px; margin: 10px auto; border-radius: 50%; }
+        .shiny-sparkle { color: #ff00ff; animation: blink 1s infinite alternate; font-size: 12px; font-weight: bold; display: none; }
+        .desc { font-size: 14px; color: #ddd; background: #1f1f1f; padding: 10px; border-radius: 6px; min-height: 40px; }
+        .btn-group { display: flex; gap: 5px; margin-top: 10px; }
+        button { flex: 1; padding: 8px; border: none; border-radius: 6px; background: #00ffcc; color: #000; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #00ccaa; }
+        button:disabled { background: #444; color: #888; cursor: not-allowed; }
+        button.btn-shiny-toggle { background: #ff00ff; color: #fff; display: none; }
+        .locked-text { color: #666; font-style: italic; text-align: center; padding: 20px 0; }
+        @keyframes blink { from { opacity: 0.4; } to { opacity: 1; } }
     </style>
 </head>
 <body>
 
-    <div id="flash-overlay"></div>
+    <h1>🇨🇳 台湾修学旅行パチモン図鑑 🇹🇼</h1>
+    <div class="grid" id="zukan-grid"></div>
 
-    <div id="fullscreen-overlay" class="fullscreen-overlay">
-        <div class="alert-card">
-            <div class="alert-title">⚡ SPOT DETECTED ⚡</div>
-            <p style="font-size: 16px; margin: 15px 0;">スポット「<span id="alert-spot-name" style="font-weight: bold; color: #007BFF;"></span>」に到着しました！</p>
-            <p style="font-size: 18px; font-weight: bold; color: #2E7D32; background: #E8F5E9; padding: 10px; border-radius: 10px;">野生の「<span id="alert-monster-name"></span>」が出現中！</p>
-            <div style="margin-top: 25px;">
-                <button onclick="clickToEncounter()" style="background: #4CAF50; box-shadow: 0 4px 0 #388E3C; width: 85%;">パチモンを探す！</button><br>
-                <button onclick="closeFullScreenNotification()" style="background: #9e9e9e; box-shadow: 0 4px 0 #757575; font-size: 13px; padding: 6px 15px; margin-top: 10px;">あとで（閉じる）</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="desc-modal" class="fullscreen-overlay" onclick="closeMonsterDesc()">
-        <div class="alert-card" onclick="event.stopPropagation()">
-            <h2 id="modal-monster-name" style="color: #4CAF50; margin-top:0;">パチモンデータ</h2>
-            <img id="modal-monster-img" src="" style="width:120px; height:120px; object-fit:cover; border-radius:10px; background:#eee; border:2px solid #ccc; margin:10px 0;">
-            <p id="modal-monster-desc" style="font-size: 14px; text-align:left; line-height:1.6; background:#f5f5f5; padding:15px; border-radius:10px; min-height:60px; color:#444;"></p>
-            <button onclick="closeMonsterDesc()" style="background: #007BFF; box-shadow: 0 4px 0 #0056b3; font-size: 14px; padding: 8px 20px; margin-top: 10px;">とじる</button>
-        </div>
-    </div>
-
-    <h1><span class="clickable-flag" onclick="tapFlag(event)">🇹🇼</span> パチモンGO <span class="clickable-flag" onclick="tapFlag(event)">🇹🇼</span></h1>
-    
-    <div class="card" id="login-area">
-        <h3>プレイヤー登録</h3>
-        <input type="text" id="username-input" placeholder="名前を入力" style="padding: 12px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; width: 80%; margin-bottom: 15px;"><br>
-        
-        <p style="margin: 5px 0; font-weight: bold;">所属の組を選択</p>
-        <div class="team-container">
-            <button type="button" class="team-btn" id="btn-team1" onclick="selectTeam('1')">1組</button>
-            <button type="button" class="team-btn" id="btn-team2" onclick="selectTeam('2')">2組</button>
-            <button type="button" class="team-btn" id="btn-team3" onclick="selectTeam('3')">3組</button>
-            <button type="button" class="team-btn" id="btn-team4" onclick="selectTeam('4')">4組</button>
-            <button type="button" class="team-btn" id="btn-team5" onclick="selectTeam('5')">5組</button>
-            <button type="button" class="team-btn" id="btn-team6" onclick="selectTeam('6')">6組</button>
-            <button type="button" class="team-btn" id="btn-team7" onclick="selectTeam('7')">7組</button>
-            <button type="button" class="team-btn" id="btn-team8" onclick="selectTeam('8')">8組</button>
-        </div>
-        
-        <div style="margin-top: 20px;">
-            <button onclick="startGame()" style="background: #E91E63; box-shadow: 0 4px 0 #C2185B; width: 60%;">ゲームスタート</button>
-        </div>
-    </div>
-
-    <div id="game-area" style="display: none;">
-        <div class="card" style="padding: 10px;">
-            <h4 style="margin: 5px 0; color:#007BFF;">🗺️ リアルタイム周辺マップ</h4>
-            <div id="map"></div>
-        </div>
-
-        <div class="card">
-            <h2>こんにちは、<span id="player-name" style="color:#007BFF;"></span> さん!</h2>
-            <p>所属: <span id="player-team" style="font-weight:bold; color:#4CAF50;"></span></p>
-            <p>現在の合計ポイント: <span id="my-score" style="font-weight:bold; color:#FF5722; font-size:20px;">0</span> P</p>
-            <div id="status" style="margin-top:10px; font-weight:bold; background:#e3f2fd; padding:10px; border-radius:8px;"></div>
+    <script>
+        // モンスターマスターデータ
+        const monsterData = [
+            // 通常モンスター
+            { id: 1, type: 'normal', location: 'ホテル', name: '小籠包くん', desc: '一見なんの変哲もない小籠包。彼の中には熱き魂が、、、', emoji: '🥟', canShiny: false },
+            { id: 2, type: 'normal', location: '桃園空港', name: '隊ワン', desc: '隊列になった犬たち。かわいい。', emoji: '🐕', canShiny: true },
+            { id: 3, type: 'normal', location: '淡水', name: '鯛わん', desc: '淡水にいるけど海水魚。', emoji: '🐟', canShiny: true },
+            { id: 4, type: 'normal', location: '九份', name: '湯爺爺', desc: '千と千尋の神隠しが好きなお爺さん。', emoji: '👴', canShiny: true },
+            { id: 5, type: 'normal', location: '龍山寺', name: 'カス寺', desc: '逆張りだけが生きがいの不良。逆張りはただの自己満である。', emoji: '📿', canShiny: true },
+            { id: 6, type: 'normal', location: '台北駅', name: 'タピ岡先生', desc: '歴史ヲタク。', emoji: '🧋', canShiny: true },
+            { id: 7, type: 'normal', location: '台北101', name: '台北110', desc: '街の安全を守る存在。税金はきちんと払っている。', emoji: '🏢', canShiny: true },
+            { id: 8, type: 'normal', location: '猫空', name: 'にゃんくう', desc: '隊ワンに対抗意識を燃やしているネコ。愛くるしさも全て計算である。', emoji: '🐱', canShiny: true },
+            { id: 9, type: 'normal', location: '故宮博物院', name: '白菜さん', desc: '歯磨きを知らない。風呂はキャンセルしてないらしい。', emoji: '🥬', canShiny: true },
+            { id: 10, type: 'normal', location: '中正紀念堂', name: '紹介石', desc: 'パワーストーンが好きな怪しいおじさん。', emoji: '🔮', canShiny: true },
+            { id: 11, type: 'normal', location: '台北市立動物園', name: 'パンパンパンダ', desc: '笹の食べ過ぎで太ったパンダ。でも、逆に人気らしい。人間もそうありたいものだ。', emoji: '🐼', canShiny: true },
+            { id: 12, type: 'normal', location: '十分', name: '天燈蟲', desc: '願いを叶える力はない。ただ飛ぶだけである。蛍と間違えられると怒る。', emoji: '🏮', canShiny: true },
+            { id: 13, type: 'normal', location: '西門町', name: 'サイモン', desc: '某審査員と似て、イギリスで音楽を勉強しているパチモン。', emoji: '🎙️', canShiny: true },
+            { id: 14, type: 'normal', location: '永康街', name: 'マンゴリラ', desc: '可食部はゴリラの部分だけらしい。一体上の部分はなんだというのか。', emoji: '🦍', canShiny: true },
+            { id: 15, type: 'normal', location: '士林夜市', name: 'ルーローはん', desc: '知らんけど、そう言い残して彼は大阪へ帰った。', emoji: '🍚', canShiny: true },
             
-            <button id="radar-appear-btn" onclick="clickToEncounter()" style="display:none; background: #4CAF50; box-shadow: 0 4px 0 #388E3C; margin-top:10px; animation: pulse 0.8s infinite alternate; width:90%;">モンスターを探す！</button>
-        </div>
+            // 隠しモンスター
+            { id: 16, type: 'hidden', location: '三国丘高校で会える', name: 'ミクニン', desc: '僕らと一緒には来てくれないらしい。', emoji: '🏫', canShiny: true },
+            { id: 17, type: 'hidden', location: '関西国際空港で会える', name: 'ジャポン', desc: '飛行機が怖くて世界を知らない蛙。船もあるのに。まさに井の中の蛙である。', emoji: '🐸', canShiny: true },
+            { id: 18, type: 'hidden', location: '画面を連打すると出現', name: 'レンダキング', desc: '隠しキャラの定番。高橋名人は今見てもすごいよね。', emoji: '👑', canShiny: true },
+            { id: 19, type: 'hidden', location: '放置していると出現', name: 'ホウチドラゴン', desc: 'よくぞここまで。', emoji: '🐉', canShiny: true },
+            { id: 20, type: 'hidden', location: '小籠包くんを譲渡進化', name: '超籠包', desc: '小籠包の中身が譲渡で成長。中身を見たものは次の日にはいなくなっている。', emoji: '🔱', canShiny: true }
+        ];
 
-        <div id="event-area" class="card encounter-card" style="display: none;">
-            <h2 style="color: #E91E63; margin-top: 5px;">⚠️ モンスター遭遇！ ⚠️</h2>
-            <img id="monster-img" src="" class="battle-img">
-            <p id="monster-info" style="font-size: 18px; font-weight: bold; line-height: 1.4;"></p>
-            <button id="catch-btn" onclick="tryCatch()">パチゼロボールを投げる！</button>
-        </div>
+        // プレイヤーの状態管理
+        const playerState = {};
+        monsterData.forEach(m => {
+            playerState[m.id] = { count: 0, unlocked: false, hasShiny: false, viewMode: 'normal' };
+        });
 
-        <div class="card">
-            <h3 style="color: #FF9800;">🏆 リアルタイムランキング (TOP 10) 🏆</h3>
-            <div class="spot-list" id="ranking-ui"></div>
-        </div>
+        // 譲渡イベント用フラグ
+        let hasReceivedTransfer = false;
 
-        <div class="card">
-            <h3 style="color: #4CAF50;">📖 パチモン図鑑（全20種）</h3>
-            <p style="font-size: 11px; color:#888; margin-top:-10px;">タップすると詳しい説明が見られるよ！</p>
-            <div class="book-grid" id="book-grid-ui"></div>
-        </div>
-    </div>
+        const grid = document.getElementById('zukan-grid');
 
+        function renderZukan() {
+            grid.innerHTML = '';
+            
+            monsterData.forEach(m => {
+                const state = playerState[m.id];
+                const card = document.createElement('div');
+                card.className = `card ${state.unlocked ? 'unlocked' : ''} ${state.viewMode === 'shiny' ? 'shiny-mode' : ''}`;
+                
+                // 隠しモンスター（未入手）の完全隠蔽
+                if (m.type === 'hidden' && !state.unlocked) {
+                    card.innerHTML = `
+                        <div class="badge hidden">SECRET</div>
+                        <div class="locked-text">❓ ？？？？？？？？？？</div>
+                        <button onclick="getMonster(${m.id})">条件クリア(デバッグ用)</button>
+                    `;
+                    grid.appendChild(card);
+                    return;
+                }
+
+                const badgeText = m.type === 'normal' ? '通常' : '隠し';
+                const badgeClass = m.type === 'normal' ? 'normal' : 'hidden';
+                
+                let html = `<div class="badge ${badgeClass}">${badgeText}</div>`;
+                html += m.type === 'normal' ? `<div class="location">📍 出現場所: ${m.location}</div>` : `<div class="location">✨ 解放条件: ${m.location}</div>`;
+
+                if (state.unlocked) {
+                    // 解放済みの見た目
+                    const currentEmoji = state.viewMode === 'shiny' ? '✨' + m.emoji + '✨' : m.emoji;
+                    const displayName = state.viewMode === 'shiny' ? m.name + ' (色違い)' : m.name;
+                    
+                    html += `
+                        <div class="monster-name">${displayName} <span class="shiny-sparkle" id="sparkle-${m.id}">★SHINY★</span></div>
+                        <div class="monster-img">${currentEmoji}</div>
+                        <div class="desc">${m.desc}</div>
+                    `;
+
+                    // ボタン配置
+                    if (m.id === 1) {
+                        // 小籠包くん専用ボタン（1度だけ譲渡を受けられる）
+                        html += `
+                            <div class="btn-group">
+                                <button id="transfer-btn" onclick="receiveTransfer()" ${hasReceivedTransfer ? 'disabled' : ''}>
+                                    ${hasReceivedTransfer ? '譲渡受付済み' : '友達から譲渡を受ける'}
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        // 通常の獲得ボタン
+                        html += `
+                            <div class="btn-group">
+                                <button onclick="getMonster(${m.id})">さらにGET</button>
+                                <button class="btn-shiny-toggle" id="shiny-btn-${m.id}" onclick="toggleShiny(${m.id})">色違い切替</button>
+                            </div>
+                        `;
+                    }
+                } else {
+                    // 未解放状態（場所のみ表示）
+                    html += `
+                        <div class="monster-name">？？？？？</div>
+                        <div class="monster-img">🔒</div>
+                        <div class="desc" style="color:#555; text-align:center;">未入手のためデータなし</div>
+                        <div class="btn-group">
+                            <button onclick="getMonster(${m.id})">現地で捕まえる</button>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = html;
+                grid.appendChild(card);
+
+                // 各種ボタン・エフェクトの動的制御
+                if (state.unlocked) {
+                    if (state.hasShiny) {
+                        const shinyBtn = document.getElementById(`shiny-btn-${m.id}`);
+                        if (shinyBtn) shinyBtn.style.display = 'block';
+                    }
+                    if (state.viewMode === 'shiny') {
+                        const sparkle = document.getElementById(`sparkle-${m.id}`);
+                        if (sparkle) sparkle.style.display = 'inline';
+                    }
+                }
+            });
+        }
+
+        // 通常のモンスター獲得処理
+        function getMonster(id) {
+            const m = monsterData.find(x => x.id === id);
+            const state = playerState[id];
+
+            state.unlocked = true;
+            state.count += 1;
+
+            // 色違い判定 (小籠包くん以外、10%の確率)
+            if (m.canShiny && !state.hasShiny) {
+                if (Math.random() < 0.10) { 
+                    alert(`✨おめでとう！ 色違いの「${m.name}」を捕まえた！ ✨`);
+                    state.hasShiny = true;
+                    state.viewMode = 'shiny';
+                }
+            }
+            renderZukan();
+        }
+
+        // 色違いスキンの切り替え
+        function toggleShiny(id) {
+            const state = playerState[id];
+            state.viewMode = state.viewMode === 'normal' ? 'shiny' : 'normal';
+            renderZukan();
+        }
+
+        // ★小籠包くんの譲渡・進化イベント処理
+        function receiveTransfer() {
+            if (hasReceivedTransfer) return;
+
+            // 自分がまだ「小籠包くん」を持っていない場合はイベントが起きない
+            if (!playerState[1].unlocked) {
+                alert('まだ自分の「小籠包くん」を捕まえていません！ホテルで手に入れてから譲渡を受けましょう。');
+                return;
+            }
+
+            // フラグをオンにして、1度きりにロック
+            hasReceivedTransfer = true;
+
+            // 進化先「超籠包」を強制解放（元の小籠包くんはそのまま生存）
+            playerState[20].unlocked = true;
+            playerState[20].count += 1;
+
+            alert('🔴通信完了！友達から小籠包くんが譲渡された！\n\nその瞬間、あなたの持っていた小籠包くんの中身が急成長を遂げ、隠しモンスター「超籠包」へと進化した！\n（※元の小籠包くんのデータも図鑑に残っています…）');
+            
+            renderZukan();
+        }
+
+        // 初期起動
+        renderZukan();
+    </script>
 </body>
 </html>
