@@ -8,7 +8,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // ── 【あなたのFirebase設定を合体！】 ──
+        // ── 【あなたのFirebase設定】 ──
         const firebaseConfig = {
             apiKey: "AIzaSyAao7sTYNZW-Fohull07j6JNz3KZ_TVsLA",
             authDomain: "pachimon-go.firebaseapp.com",
@@ -68,7 +68,7 @@
             document.getElementById("btn-team" + teamName).classList.add("selected");
         }
 
-        // ゲーム開始＆ログイン（ここでデータベースから自分のデータを取得・作成）
+        // ゲーム開始＆ログイン
         window.startGame = async function() {
             myUsername = document.getElementById("username-input").value.trim();
             if (!myUsername) { alert("名前を入力してね！"); return; }
@@ -78,11 +78,9 @@
             const userSnap = await getDoc(userRef);
 
             if (userSnap.exists()) {
-                // 既存ユーザーならデータを読み込む
                 userData = userSnap.data();
-                myTeam = userData.team || myTeam; // チームを上書き
+                myTeam = userData.team || myTeam;
             } else {
-                // 新規ユーザーならデータ作成
                 userData = { username: myUsername, team: myTeam, score: 0, caught: {}, playedSpots: {} };
                 await setDoc(userRef, userData);
             }
@@ -95,7 +93,7 @@
             document.getElementById("game-area").style.display = "block";
             
             updateSpotListUI();
-            startRankingListener(); // ランキングのリアルタイム同期スタート
+            startRankingListener();
         }
 
         // GPS周辺スキャン
@@ -131,7 +129,7 @@
         }
 
         function triggerCatchEvent(spot) {
-            currentIsRare = Math.random() <= 0.10; // 10%でレア
+            currentIsRare = Math.random() <= 0.10;
             const monsterSprite = document.getElementById("monster-sprite");
             const monsterInfo = document.getElementById("monster-info");
             
@@ -148,33 +146,88 @@
             document.getElementById("event-area").style.display = "block";
         }
 
-        // 捕獲処理（結果をFirebaseに即保存）
+        // 捕獲処理
         window.tryCatch = async function() {
             if (!currentActiveSpot || userData.playedSpots[currentActiveSpot.id]) return;
             
-            // 1人1回制限
             userData.playedSpots[currentActiveSpot.id] = true;
             document.getElementById("catch-btn").classList.add("disabled");
             document.getElementById("catch-btn").innerText = "終了";
 
-            const isSuccess = Math.random() <= 0.70; // 70%でゲット
+            const isSuccess = Math.random() <= 0.70;
 
             if (isSuccess) {
-                // 図鑑に登録（レアか通常か）
                 userData.caught[currentActiveSpot.id] = currentIsRare ? "rare" : "normal";
-                // スコア計算
                 userData.score += currentIsRare ? 30 : 10;
                 alert(currentIsRare ? `🎉レアの「${currentActiveSpot.monster}」を捕まえた！(30P)` : `🎉「${currentActiveSpot.monster}」を捕まえた！(10P)`);
             } else {
                 alert(`😭「${currentActiveSpot.monster}」は逃げてしまった...！`);
             }
 
-            // Firebaseのデータを更新
             await setDoc(doc(db, "users", myUsername), userData);
-
             document.getElementById("my-score").innerText = userData.score;
             document.getElementById("event-area").style.display = "none";
             updateSpotListUI();
+        }
+
+        // ── 【新規追加：同じチーム内でのモンスター譲渡（交換）機能】 ──
+        window.giftMonster = async function(spotId, monsterName, rarity) {
+            const targetName = prompt(`「${monsterName}」を誰にあげますか？\n相手の「正確なユーザー名」を入力してください。`);
+            if (!targetName) return;
+            if (targetName === myUsername) { alert("自分自身にはあげられません！"); return; }
+
+            const myRef = doc(db, "users", myUsername);
+            const targetRef = doc(db, "users", targetName);
+
+            try {
+                // トランザクション（同時にデータが書き換わってもバグらない安全な同時処理）
+                await runTransaction(db, async (transaction) => {
+                    const mySnap = await transaction.get(myRef);
+                    const targetSnap = await transaction.get(targetRef);
+
+                    if (!targetSnap.exists()) {
+                        throw "相手のユーザーが見つかりません。名前が合っているか確認してね！";
+                    }
+
+                    const myDataLocal = mySnap.data();
+                    const targetDataLocal = targetSnap.data();
+
+                    // 同じチームかどうかのチェック
+                    if (myDataLocal.team !== targetDataLocal.team) {
+                        throw `相手は違うチーム(${targetDataLocal.team}チーム)です！\n同じチームの人にしかあげられません。`;
+                    }
+
+                    // 相手がすでにそのスポットのモンスターを持っているかチェック
+                    if (targetDataLocal.caught[spotId]) {
+                        throw `相手はすでに「${monsterName}」を持っています！`;
+                    }
+
+                    // 譲渡処理の実行
+                    const lostScore = (rarity === "rare") ? 30 : 10;
+
+                    // 1. 自分のデータから削除
+                    delete myDataLocal.caught[spotId];
+                    myDataLocal.score -= lostScore;
+
+                    // 2. 相手のデータに追加（相手は現地に行っていないのでplayedSpotsは触らない）
+                    targetDataLocal.caught[spotId] = rarity;
+                    targetDataLocal.score += lostScore;
+
+                    // 3. データベースに反映
+                    transaction.update(myRef, myDataLocal);
+                    transaction.update(targetRef, targetDataLocal);
+
+                    // ローカルの自分側のデータも更新
+                    userData = myDataLocal;
+                });
+
+                alert(`🎉 譲渡成功！\n${targetName} さんに「${monsterName}」をプレゼントしました！`);
+                document.getElementById("my-score").innerText = userData.score;
+                updateSpotListUI();
+
+            } catch (error) {
+                alert("❌ エラー: " + error);
+            }
         }
 
         // UI（簡易図鑑）の更新
@@ -183,12 +236,22 @@
             listDiv.innerHTML = "";
             spots.forEach(spot => {
                 let statusText = "❌未所持";
+                let giftButton = "";
                 const status = userData.caught[spot.id];
-                if (status === "normal") statusText = "✅通常 (10P)";
-                if (status === "rare") statusText = "✨金ピカ (30P)";
-                if (!status && userData.playedSpots[spot.id]) statusText = "💨逃げられた";
                 
-                listDiv.innerHTML += `<div>・<b>${spot.name}</b>: ${statusText}</div>`;
+                if (status === "normal") {
+                    statusText = "✅通常 (10P)";
+                    giftButton = ` <button onclick="giftMonster(${spot.id}, '${spot.monster}', 'normal')" style="padding:4px 8px; font-size:11px; background:#007BFF; box-shadow:0 2px 0 #0056b3; margin:0 0 0 5px; border-radius:5px;">あげる</button>`;
+                }
+                if (status === "rare") {
+                    statusText = "✨金ピカ (30P)";
+                    giftButton = ` <button onclick="giftMonster(${spot.id}, '${spot.monster}', 'rare')" style="padding:4px 8px; font-size:11px; background:#007BFF; box-shadow:0 2px 0 #0056b3; margin:0 0 0 5px; border-radius:5px;">あげる</button>`;
+                }
+                if (!status && userData.playedSpots[spot.id]) {
+                    statusText = "💨逃げられた";
+                }
+                
+                listDiv.innerHTML += `<div style="margin-bottom:5px;">・<b>${spot.name}</b>: ${statusText}${giftButton}</div>`;
             });
         }
 
@@ -198,7 +261,6 @@
                 let players = [];
                 snapshot.forEach(doc => players.push(doc.data()));
 
-                // スコアが高い順（ランキング）に並び替え
                 players.sort((a, b) => b.score - a.score);
 
                 const rankDiv = document.getElementById("ranking-ui");
@@ -217,7 +279,7 @@
         .disabled { background: #9e9e9e !important; box-shadow: 0 4px 0 #757575 !important; cursor: not-allowed; }
         .monster-box { font-size: 70px; margin: 10px; animation: bounce 0.5s infinite alternate; }
         @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-10px); } }
-        .spot-list { text-align: left; font-size: 14px; max-height: 150px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 8px; }
+        .spot-list { text-align: left; font-size: 14px; max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 8px; }
         .team-btn { background: #007BFF; box-shadow: 0 4px 0 #0056b3; }
         .team-btn.selected { background: #4CAF50 !important; box-shadow: 0 4px 0 #388E3C !important; }
     </style>
@@ -258,7 +320,7 @@
 
         <div class="card">
             <h3 style="color: #FF9800;">🏆 リアルタイムランキング 🏆</h3>
-            <div class="spot-list" id="ranking-ui" style="max-height: 200px;"></div>
+            <div class="spot-list" id="ranking-ui"></div>
         </div>
 
         <div class="card">
